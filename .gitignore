@@ -1,1 +1,6 @@
 example-source
+demo
+venv
+*_pycache_*
+.pyc
+node_modules

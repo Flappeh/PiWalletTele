@@ -2,17 +2,15 @@ import { useState } from "react";
 import "./App.css";
 import ProductBox from "./components/ProductBox";
 
-function App() {
-  const [count, setCount] = useState(0);
+import Shop from "./Shop";
 
+function App() {
   return (
     <>
       <h1>Demo Pi Wallet Checker</h1>
       <div className="card">
         <ProductBox></ProductBox>
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
+        <Shop />
         <p>
           Edit <code>src/App.tsx</code> and save to test HMR
         </p>
