@@ -1,11 +1,16 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, send_from_directory
 from flask_bootstrap import Bootstrap
 from modules.environment import PI_API_KEY
 import simplejson as json
 import requests
 import random
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    static_url_path='',
+    static_folder='static',
+    template_folder='templates'        
+)
 
 header = {
     'Authorization': f"Key {PI_API_KEY}"
@@ -16,6 +21,10 @@ Bootstrap(app)
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/validation-key.txt')
+def validation():
+    return app.send_static_file('validation-key.txt')
 
 @app.route('/get_quote')
 def get_quote():
