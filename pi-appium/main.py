@@ -1,22 +1,24 @@
 import unittest
 from appium import webdriver
 from appium.webdriver.common.appiumby import AppiumBy
+from appium.options.common.base import AppiumOptions
 
 capabilities = dict(
     platformName='Android',
     automationName='uiautomator2',
-    deviceName='Android',
+    deviceName='emulator-5554',
     appPackage='com.android.settings',
     appActivity='.Settings',
     language='en',
     locale='US'
 )
 
-appium_server_url = 'http://localhost:4723'
+appium_server_url = 'http://localhost:4724'
 
 class TestAppium(unittest.TestCase):
     def setUp(self) -> None:
-        self.driver = webdriver.Remote(appium_server_url, capabilities)
+        app_options = AppiumOptions()
+        self.driver = webdriver.Remote(appium_server_url, options=app_options.load_capabilities(caps=capabilities))
 
     def tearDown(self) -> None:
         if self.driver:
