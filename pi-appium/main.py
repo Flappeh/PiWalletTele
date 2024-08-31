@@ -17,8 +17,8 @@ capabilities: Dict[str, Any] = {
     "language": "en"
 }
 
-appium_server_url = "http://localhost:4724"
-# appium_server_url = "http://192.168.18.211:4723"
+# appium_server_url = "http://localhost:4724"
+appium_server_url = "http://192.168.18.221:4723"
 
 driver = webdriver.Remote(appium_server_url, options=AppiumOptions().load_capabilities(capabilities))
 
