@@ -2,7 +2,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 from modules.environment import BOT_USERNAME,TOKEN, get_all_env
 from modules.blockchain import get_balance_from_public_key
-from modules.androidBot import open_wallet_from_passphrase
+from modules.androidBot import AndroidBot
 from typing import List
 
 # Commands
@@ -34,10 +34,16 @@ async def from_passphrase_command(update: Update, context: ContextTypes.DEFAULT_
     if len(phrase) != 24:
         await update.message.reply_text("Passphrase harus 24 kata!")
         return
+    await update.message.reply_text("Sedang memproses request...")
     try:
         phrase = ' '.join(phrase)
-        data = await open_wallet_from_passphrase(phrase)
-        await update.message.reply_text(data)
+        bot = AndroidBot()
+        data = bot.open_wallet_from_passphrase(phrase)
+        if "Invalid" in data:
+            await update.message.reply_text("Invalid Phrase Given")
+        else:
+            await update.message.reply_text(f"Jumlah wallet {data}")
+        del bot
     except:
         await update.message.reply_text("Error occured, please contact administrator")
 # Responses
