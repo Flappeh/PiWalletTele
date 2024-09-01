@@ -71,23 +71,25 @@ class AndroidBot():
         if "Translation loading ..." in CURRENT_PAGE_SOURCE:
             self.click_update()
             return "update"
-        print(CURRENT_PAGE_SOURCE)
         return ""
 
     def check_current_wallet_balance(self):
         current_page = self.check_current_page()
+        print("Here")
         while current_page != "wallet_page":
-            pass
-            # if current_page == "notification":
-            #     self.click_notif()
-            # if current_page == "update":
-            #     self.click_update()
-            # if current_page == "verification":
-            #     self.verify_wallet()
+            print("Test here")
+            if current_page == "notification":
+                self.click_notif()
+            if current_page == "update":
+                self.click_update()
+            if current_page == "verification":
+                self.verify_wallet()
             current_page = self.check_current_page()
-        anchor = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, " Pi")]')
-        return anchor.text
-
+        try:
+            anchor = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, " Pi")]')
+            return anchor.text
+        except:
+            logger.error("Error checking curent balance")
     def reload_wallet_page(self):
         try:
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Send / Receive")]').click()
@@ -139,12 +141,15 @@ class AndroidBot():
         login_box.send_keys(pwd)
         try:
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Unlock With")]').click()
+            return True
         except Exception as e:
             logger.error("Error finding login button")
         try:
-            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Unlock with")]').click()
+            private_key_button = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "private key")]')
+            if private_key_button:
+                self.driver.find_element(by=AppiumBy.XPATH, value='//*[@resource-id="address-bar-back-button"]').click()
         except Exception as e:
-            logger.error("Error finding login button")
+            logger.error("Error going back from developer wallet")
         
         
         
