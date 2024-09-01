@@ -1,20 +1,32 @@
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
-from modules.environment import BOT_USERNAME,TOKEN, get_all_env
+from modules.environment import BOT_USERNAME,TOKEN
 from modules.blockchain import get_balance_from_public_key
 from modules.androidBot import AndroidBot
 from typing import List
+import datetime
 
 # Commands
 
+def check_time(update: Update) -> bool:
+    if update.message.date.timestamp() < datetime.datetime.now().timestamp() - 5:
+        return True
+    return False
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if check_time(update):
+        return
     await update.message.reply_text("Hello There")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if check_time(update):
+        return
     await update.message.reply_text("This is the help Text")
 
 
 async def from_wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if check_time(update):
+        return
     wallet_key: List[str] = context.args    
     if len(wallet_key) > 1:
         await update.message.reply_text("Only one key allowed per request")
@@ -30,6 +42,8 @@ async def from_wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(e)
 
 async def from_passphrase_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if check_time(update):
+        return
     phrase: List[str] = context.args
     if len(phrase) != 24:
         await update.message.reply_text("Passphrase harus 24 kata!")
@@ -59,6 +73,8 @@ def handle_response(text: str) -> str:
     return "Nothing known"
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if check_time(update):
+        return
     message_type: str = update.message.chat.type # Group or Private Chat
     text: str = update.message.text
     
@@ -87,8 +103,8 @@ if __name__ == "__main__":
     # Command
     app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('help', help_command))
-    app.add_handler(CommandHandler('wallet', from_wallet_command))
-    app.add_handler(CommandHandler('phrase', from_passphrase_command))
+    app.add_handler(CommandHandler('check_wallet', from_wallet_command))
+    app.add_handler(CommandHandler('check_phrase', from_passphrase_command))
     
     # Messages
     app.add_handler(MessageHandler(filters.Text, handle_message))

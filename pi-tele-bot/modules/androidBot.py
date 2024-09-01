@@ -66,11 +66,12 @@ class AndroidBot():
         if "Others can search for your" in CURRENT_PAGE_SOURCE:
             self.verify_wallet()
             return "verification"
-        if "History" in CURRENT_PAGE_SOURCE and "Migrations" in CURRENT_PAGE_SOURCE and "Wallet" in CURRENT_PAGE_SOURCE:
+        if "Available Balance" in CURRENT_PAGE_SOURCE:
             return "wallet_page"
         if "Translation loading ..." in CURRENT_PAGE_SOURCE:
             self.click_update()
             return "update"
+        
         return ""
 
     def check_current_wallet_balance(self):
