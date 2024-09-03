@@ -48,7 +48,7 @@ async def from_passphrase_command(update: Update, context: ContextTypes.DEFAULT_
     if len(phrase) != 24:
         await update.message.reply_text("Passphrase harus 24 kata!")
         return
-    await update.message.reply_text("Sedang memproses request...")
+    proses_message = await update.message.reply_text("Sedang memproses request...") 
     try:
         phrase = ' '.join(phrase)
         bot = AndroidBot()
@@ -60,6 +60,7 @@ async def from_passphrase_command(update: Update, context: ContextTypes.DEFAULT_
         del bot
     except:
         await update.message.reply_text("Error occured, please contact administrator")
+    await context.bot.delete_message(chat_id=update.effective_chat.id,message_id=proses_message.message_id)
 # Responses
 
 def handle_response(text: str) -> str:
