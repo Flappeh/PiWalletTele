@@ -1,0 +1,15 @@
+services:
+  appium-server:
+    image: appium/appium
+    container_name: appium-server
+    ports:
+      - 4723:4723
+    network_mode: host
+    privileged: true
+    volumes:
+      - /home/flappeh/.android:/home/androidusr/.android
+    environment:
+      - REMOTE_ADB=true
+      - ANDROID_DEVICES=localhost:5555
+      - REMOTE_ADB_POLLING_SEC=30
+      - APPIUM_ADDITIONAL_PARAMS=--relaxed-security --allow-insecure chromedriver_autodownload --allow-insecure adb_shell

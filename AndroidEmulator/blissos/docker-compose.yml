@@ -1,22 +1,23 @@
 services:
   docker-droid:
-    image: budtmo/docker-android:emulator_11.0
+    image: sickcodes/dock-droid:latest
     devices:
       - "/dev/kvm:/dev/kvm"
     restart: always
-    container_name: android-pi
+    container_name: dock-droid
     environment:
-      - APPIUM=true
-      - WEB_VNC=false
-      - EMULATOR_DEVICE=Nexus 4
-    volumes:
-      - pi-android-data:/home/androidusr
+      - EXTRA=-display none -vnc 0.0.0.0:99,password=off
     ports:
-      - 4723:4723
-      - 5554:5554
       - 5555:5555
-      - 6080:6080
+      - 5999:5999
+      - 50922:10022
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - blissos:/home/arch
+    group_add:
+      - video
     runtime: nvidia
+    privileged: true
     deploy:
       resources:
         limits:
@@ -29,5 +30,6 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [ gpu ]
+
 volumes:
-  pi-android-data:
+  blissos:
