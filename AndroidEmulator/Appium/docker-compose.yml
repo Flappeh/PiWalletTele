@@ -6,6 +6,7 @@ services:
       - 4723:4723
     network_mode: host
     privileged: true
+    restart: always
     volumes:
       - /home/flappeh/.android:/home/androidusr/.android
     environment:
