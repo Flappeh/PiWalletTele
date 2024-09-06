@@ -30,6 +30,9 @@ class PiWallet(Model):
     class Meta:
         database = db
     
+class PhoneNumber(Model):
+    phone = CharField()
+    last_used = DateTimeField()
 
 db.connect()
-db.create_tables([TeleUser,PiAccount,PiWallet])
+db.create_tables([TeleUser,PiAccount,PiWallet, PhoneNumber])

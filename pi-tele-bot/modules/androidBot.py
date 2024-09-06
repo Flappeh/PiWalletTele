@@ -40,7 +40,6 @@ class AndroidBot():
         except:
             pass
         
-        
     def check_is_loading(self):
         loading_screen = self.driver.find_element(by=AppiumBy.XPATH, value='//*[@text="Loading..."]')
         if loading_screen:
@@ -88,6 +87,7 @@ class AndroidBot():
             return balance.text
         except Exception as e:
             logger.error(f"Error checking curent balance, error : {e}")
+            
     def reload_wallet_page(self):
         try:
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Send / Receive")]').click()
@@ -104,7 +104,10 @@ class AndroidBot():
             pass
         
     def open_wallet_sub_page(self):
-        self.driver.find_element(by=AppiumBy.XPATH, value='//*[@text="Wallet logo "]').click()
+        try:
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Wallet logo")]').click()
+        except:
+            logger.error("Error going to sub page")
         while self.check_current_page() != "wallet_home":
             self.click_notif()
             pass
@@ -158,13 +161,14 @@ class AndroidBot():
         else:
             return "ok"        
         
-        
+    def open_home_screen(self) -> None:
+        self.driver.execute_script("mobile: pressKey", {"keycode": 3})  
 
     def open_wallet_from_passphrase(self, pwd: str):
         logger.info(f"Received new request for phrase: {pwd}")
         if self.check_current_page() != "wallet_home":
+            print("Not in wallet home")
             self.navigate_to_wallet_home()
-            
         result = ""
         while result != "ok":
             result = self.login_to_wallet(pwd)
