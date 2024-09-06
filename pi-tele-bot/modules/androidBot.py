@@ -154,6 +154,7 @@ class AndroidBot():
             logger.error("Error going back from developer wallet")
         
         page = self.driver.page_source
+        print("checking for error")
         if "An error" in page:
             return "error"
         elif "invalid" in page:
