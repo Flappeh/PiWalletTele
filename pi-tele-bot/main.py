@@ -1,11 +1,14 @@
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ParseMode
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
 from modules.environment import BOT_USERNAME,TOKEN
 from modules.blockchain import get_balance_from_public_key
 from modules.androidBot import AndroidBot
 from typing import List
 import datetime
+from modules.utils import get_logger
 
+logger = get_logger()
 # Commands
 
 def check_time(update: Update) -> bool:
@@ -16,30 +19,84 @@ def check_time(update: Update) -> bool:
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if check_time(update):
         return
-    await update.message.reply_text("Hello There")
+    keyboard = [
+        [
+            InlineKeyboardButton("Help", callback_data="help"),
+        ],
+        [
+            InlineKeyboardButton("Check Wallet", callback_data="check_wallet"),
+            InlineKeyboardButton("Check Phrase", callback_data="check_phrase"),
+        ],
+        [InlineKeyboardButton("Administration", callback_data="admin")],
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text("*Pi Wallet Bot 2024*\n\n Silahkan pilih command", 
+                                    reply_markup=reply_markup,
+                                    parse_mode=ParseMode.MARKDOWN_V2)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if check_time(update):
-        return
-    await update.message.reply_text("This is the help Text")
+    if update.callback_query:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="Help text")
+    else:
+        if check_time(update):
+            return
+        await update.message.reply_text("This is the help Text")
 
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Parses the CallbackQuery and updates the message text."""
+    query = update.callback_query
 
-async def from_wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if check_time(update):
-        return
-    wallet_key: List[str] = context.args    
-    if len(wallet_key) > 1:
-        await update.message.reply_text("Only one key allowed per request")
-        return
+    await query.answer()
+        
+    try:
+        await query.delete_message()
+        match query.data:
+            case "check_wallet":
+                await from_wallet_command(update=update, context=context)
+            case "check_phrase":
+                await from_passphrase_command(update=update, context=context)
+            case "help":
+                await help_command(update=update, context=context)
+            case _:
+                context.bot.send_message(chat_id=update.effective_chat.id, text="Unknown Command")
+    except Exception as e:
+        logger.error(f"Error running command after button with identifier {query.data} is clicked!, detail: {e}")
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="Error occurred")
+
+async def from_wallet_helper(update: Update, context: ContextTypes.DEFAULT_TYPE, wallet_key: List[str]):
+    if len(wallet_key) != 1:
+            await update.message.reply_text("Mohon masukkan hanya satu wallet per transaksi")
+            return
     key = wallet_key[0]
     try:
         data = get_balance_from_public_key(key)
         if not data:
-            await update.message.reply_text("None")
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="None")
             return
-        await update.message.reply_text(text=data)
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=data)
     except Exception as e:
-        await update.message.reply_text(e)
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=str(e))
+     
+async def from_wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = ""
+    if update.callback_query:
+        
+        query = update.callback_query
+        await query.answer()
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="Masukkan public key wallet yang ingin di cari")
+        
+        print("Callback query received:", query.data)
+        data = query.data.split()
+    else:
+        if check_time(update):
+            return
+        data = context.args    
+    await from_wallet_helper(update,context,data)
+        
+async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, I didn't understand that command.")
 
 async def from_passphrase_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if check_time(update):
@@ -58,8 +115,9 @@ async def from_passphrase_command(update: Update, context: ContextTypes.DEFAULT_
         else:
             await update.message.reply_text(f"Jumlah wallet {data}")
         del bot
-    except:
+    except Exception as e:
         await update.message.reply_text("Error occured, please contact administrator")
+        logger.error(f"Error retrieving passphrase details, {e}")
     await context.bot.delete_message(chat_id=update.effective_chat.id,message_id=proses_message.message_id)
 # Responses
 
@@ -106,9 +164,10 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler('help', help_command))
     app.add_handler(CommandHandler('check_wallet', from_wallet_command))
     app.add_handler(CommandHandler('check_phrase', from_passphrase_command))
+    app.add_handler(CallbackQueryHandler(button))
     
     # Messages
-    app.add_handler(MessageHandler(filters.Text, handle_message))
+    app.add_handler(MessageHandler(filters.TEXT, handle_message))
     
     # Errors
     app.add_error_handler(handle_error)

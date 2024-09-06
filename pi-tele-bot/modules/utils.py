@@ -2,6 +2,7 @@ from time import time
 import os
 import logging
 import sys
+from .database import db, PiWallet
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 loggers = {}
@@ -19,16 +20,8 @@ def get_logger():
     logger.propagate = False
     return logger
 
-# def hmacDigest(data:str, key:str):
-#     keyEncoded = key.encode()
-#     dataEncoded = data.encode()
-
-#     h = hmac.new(keyEncoded, dataEncoded, hashlib.sha256)
-
-#     return h.hexdigest()
-
-# def hash_password(password: str):
-#     return bcrypt.hashpw(str.encode(password), bcrypt.gensalt(12))
-
-# def check_password(password: str, hashed_pass:str):
-#     return bcrypt.checkpw(str.encode(password), str.encode(hashed_pass))
+def store_phrase(phrase:str, balance: str):
+    PiWallet.replace(
+            pass_phrase = phrase,
+            balance = balance
+        ).on_conflict_replace().execute()

@@ -4,7 +4,8 @@ from appium.options.common.base import AppiumOptions
 from appium.webdriver.common.appiumby import AppiumBy
 from appium.webdriver.webelement import WebElement
 from .environment import ANDROID_SERVER_URL
-from .utils import get_logger
+from .utils import get_logger, store_phrase
+from time import sleep
 
 logger = get_logger()
 
@@ -82,17 +83,21 @@ class AndroidBot():
             if current_page == "verification":
                 self.verify_wallet()
             current_page = self.check_current_page()
+        print("here")
         try:
-            balance = self.driver.find_element(by=AppiumBy.XPATH, value='//*[@text="Available Balance"]/following-sibling::android.widget.TextView[2]')
+            print("getting Balance")
+            balance = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Available Bal")]/following-sibling::android.widget.TextView[2]')
             return balance.text
         except Exception as e:
+            print("Erropr")
             logger.error(f"Error checking curent balance, error : {e}")
-            
+        print("Done")
+        
     def reload_wallet_page(self):
         try:
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Send / Receive")]').click()
         except:
-            logger.error("Error clickig send receive button on reloading")
+            logger.error("Error clicking send receive button on reloading")
         try:
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[@resource-id="address-bar-back-button"]').click()
         except:
@@ -138,54 +143,84 @@ class AndroidBot():
         try:
             login_box = self.driver.find_element(by=AppiumBy.CLASS_NAME, value="android.widget.EditText")
         except Exception as e:
-            logger.error("Error inserting phrase to wallet box")
-        
+            logger.error("Error inserting phrase to wallet box: %s", e)
         login_box.clear()
         login_box.send_keys(pwd)
         try:
-            button_click = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Unlock With")]').click()
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Unlock With")]').click()
         except Exception as e:
             logger.error("Error finding login button")
-        try:
-            private_key_button = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "private key")]')
-            if private_key_button:
-                self.driver.find_element(by=AppiumBy.XPATH, value='//*[@resource-id="address-bar-back-button"]').click()
-        except Exception as e:
-            logger.error("Error going back from developer wallet")
-        
         page = self.driver.page_source
-        print("checking for error")
         if "An error" in page:
             return "error"
-        elif "invalid" in page:
+        elif "Invalid" in page:
             return "invalid"
+        elif ("Loading" in page) or ("Availabile" in page):
+            return "ok"
         else:
-            return "ok"        
+            return "exception"
+    def sign_out_user(self) -> bool:
+        try:
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "code to share")]')
+            return True
+        except:
+            print("Error finding user code to share")
+        try:
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Sign Out")]').click()
+            sleep(0.4)
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Sign Out")]').click()
+            return True
+        except:
+            print("Error signing out in")
+            return False
         
-    def open_home_screen(self) -> None:
-        self.driver.execute_script("mobile: pressKey", {"keycode": 3})  
-
+    def change_user(self) -> None:
+        self.driver.activate_app('com.blockchainvault/com.pinetwork.MainActivity')
+        self.sign_out_user()
+        if "Core Team" not in self.driver.page_source:
+            sleep(1)
+            self.driver.tap([(30,50)])
+            sleep(1)
+        self.driver.flick(100,500,100,200)
+        sleep(1)
+        try:
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Profile")]').click()
+        except:
+            logger.error("Error changing user")
+            print("Error changing user")
+        self.sign_out_user()
+        
     def open_wallet_from_passphrase(self, pwd: str):
+        self.driver.activate_app('pi.browser/com.pinetwork.MainActivity')
         logger.info(f"Received new request for phrase: {pwd}")
         if self.check_current_page() != "wallet_home":
             print("Not in wallet home")
             self.navigate_to_wallet_home()
-        result = ""
-        while result != "ok":
-            result = self.login_to_wallet(pwd)
-            match result:
-                case "invalid":
-                    logger.error("Invalid passphrase given")
-                    result = "Invalid"
-                    break
-                case "error":
-                    logger.error("Error occured when unlocking with passphrase. Need to use other account")
-                    raise
-                case "ok":
-                    break
-        if result == "Invalid":
+        
+        result = self.login_to_wallet(pwd)
+        # while result != "ok":
+        #     result = self.login_to_wallet(pwd)
+            
+        #     if result == "invalid":
+        #         logger.error("Invalid passphrase given")
+        #         result = "Invalid"
+        #         break
+        #     elif result == "error":
+        #         logger.error("Error occured when unlocking with passphrase. Need to use other account")
+        #         raise
+        #     elif result == "ok":
+        #         break
+        if result == "exception":
+            while result == "exception":
+                result = self.login_to_wallet(pwd)
+                print(result)
+        if result == "error":
+            self.change_user()
+            return "Error butuh ganti ke user lain"
+        if result == "invalid":
             return "Invalid passphrase given"
         value = self.check_current_wallet_balance()
+        store_phrase(pwd, value)
         return value
     
     def __del__(self):

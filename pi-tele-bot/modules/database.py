@@ -1,5 +1,6 @@
 from peewee import *
 import os
+from datetime import datetime
 
 DIRNAME = os.getcwd()
 
@@ -23,10 +24,10 @@ class PiAccount(Model):
     
 
 class PiWallet(Model):
-    public_key = CharField()
-    pass_phrase = CharField()
-    balance = FloatField()
-    
+    public_key = CharField(null = True)
+    pass_phrase = CharField(null = True)
+    balance = CharField(null = True)
+    last_update = DateTimeField(default=datetime.now())
     class Meta:
         database = db
     
