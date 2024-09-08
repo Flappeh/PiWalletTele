@@ -8,11 +8,11 @@ from typing import List
 import datetime
 from modules.utils import get_logger
 
-logger = get_logger()
+logger = get_logger(__name__)
 # Commands
 
 def check_time(update: Update) -> bool:
-    if update.message.date.timestamp() < datetime.datetime.now().timestamp() - 5:
+    if update.message.date.timestamp() < datetime.datetime.now().timestamp() - 600:
         return True
     return False
 
@@ -97,6 +97,26 @@ async def from_wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         
 async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, I didn't understand that command.")
+   
+
+async def proses_phrase(proses_message, context: ContextTypes.DEFAULT_TYPE, phrase: str):
+    try:
+        bot = AndroidBot()
+        data = bot.open_wallet_from_passphrase(phrase)
+        if "Invalid" in data:
+            del bot
+            return "Phrase yang dikirim invalid!"
+        elif "Error butuh ganti ke user lain" in data:
+            await context.bot.edit_message_text(text=f"Limit user tercapai, proses ganti user",chat_id=proses_message.chat_id,message_id=proses_message.id)
+            data = bot.open_wallet_after_error(phrase)
+            del bot
+            return f"Jumlah wallet {data}"
+        else:
+            del bot
+            return f"Jumlah wallet {data}"
+    except Exception as e:
+        logger.error(f"Error retrieving passphrase details, {e}")
+        return "Error occured, please contact administrator"
 
 async def from_passphrase_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if check_time(update):
@@ -105,20 +125,38 @@ async def from_passphrase_command(update: Update, context: ContextTypes.DEFAULT_
     if len(phrase) != 24:
         await update.message.reply_text("Passphrase harus 24 kata!")
         return
-    proses_message = await update.message.reply_text("Sedang memproses request...") 
+    phrase = ' '.join(phrase)
+    proses_message = await update.message.reply_text("Sedang memproses request...",reply_to_message_id=update.message.id)
+    data = await proses_phrase(proses_message,context,phrase)
+    await context.bot.edit_message_text(text=data,chat_id=proses_message.chat_id,message_id=proses_message.id)
+    
+
+async def print_page_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if check_time(update):
+        return
+    proses_message = await update.message.reply_text("Sedang memproses request...",reply_to_message_id=update.message.id) 
     try:
-        phrase = ' '.join(phrase)
         bot = AndroidBot()
-        data = bot.open_wallet_from_passphrase(phrase)
-        if "Invalid" in data:
-            await update.message.reply_text("Invalid Phrase Given")
-        else:
-            await update.message.reply_text(f"Jumlah wallet {data}")
+        data = bot.print_current_page()
+        print(data)
+        await context.bot.edit_message_text(text=f"Done",chat_id=proses_message.chat_id,message_id=proses_message.id)
+    except Exception as e:
+        await update.message.reply_text("Error occured, please contact administrator")
+        logger.error(f"Error retrieving passphrase details, {e}")
+
+async def change_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if check_time(update):
+        return
+    proses_message = await update.message.reply_text("Sedang memproses request...",reply_to_message_id=update.message.id) 
+    try:
+        bot = AndroidBot()
+        bot.change_user_command()
+        await context.bot.edit_message_text(text=f"Done Processing",chat_id=proses_message.chat_id,message_id=proses_message.id)
         del bot
     except Exception as e:
         await update.message.reply_text("Error occured, please contact administrator")
         logger.error(f"Error retrieving passphrase details, {e}")
-    await context.bot.delete_message(chat_id=update.effective_chat.id,message_id=proses_message.message_id)
+
 # Responses
 
 def handle_response(text: str) -> str:
@@ -158,12 +196,14 @@ async def handle_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == "__main__":
     app = Application.builder().token(TOKEN).build()
-    
+    logger.info("INITIALIZING Telegram Pi Wallet Bot")
     # Command
     app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('help', help_command))
-    app.add_handler(CommandHandler('check_wallet', from_wallet_command))
-    app.add_handler(CommandHandler('check_phrase', from_passphrase_command))
+    app.add_handler(CommandHandler('wallet', from_wallet_command))
+    app.add_handler(CommandHandler('phrase', from_passphrase_command))
+    app.add_handler(CommandHandler('change', change_user_command))
+    app.add_handler(CommandHandler('print', print_page_command))
     app.add_handler(CallbackQueryHandler(button))
     
     # Messages
@@ -172,5 +212,6 @@ if __name__ == "__main__":
     # Errors
     app.add_error_handler(handle_error)
     
+    logger.info("BOT RUNNING")
     app.run_polling(poll_interval=3)
     

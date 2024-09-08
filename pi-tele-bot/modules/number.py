@@ -1,4 +1,4 @@
-from .database import db, PhoneNumber
+from .database import db, PiAccount
 from datetime import datetime
 number = []
 
@@ -17,9 +17,10 @@ def import_phone_number():
     try:
         with db.atomic():
             for i in number:
-                PhoneNumber.create(
+                PiAccount.create(
                     phone = i,
-                    last_used = datetime(1990, 1, 1)
+                    last_used = datetime(1990, 1, 1),
+                    password = "Goodgame00"
                 )
     except:
         print("error inserting number")

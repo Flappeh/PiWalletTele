@@ -2,16 +2,19 @@ from time import time
 import os
 import logging
 import sys
-from .database import db, PiWallet
+from .database import PiWallet,PiAccount
+from datetime import datetime, timedelta
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 loggers = {}
 
-def get_logger():
+def get_logger(name=None):
     global loggers
-    if loggers.get(__name__):
-        return loggers.get(__name__)
-    logger = logging.getLogger(__name__)
+    if not name:
+        name = __name__
+    if loggers.get(name):
+        return loggers.get(name)
+    logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
     stream_handler = logging.StreamHandler(sys.stdout)
     log_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -20,8 +23,27 @@ def get_logger():
     logger.propagate = False
     return logger
 
+logger = get_logger()
+
 def store_phrase(phrase:str, balance: str):
-    PiWallet.replace(
-            pass_phrase = phrase,
-            balance = balance
-        ).on_conflict_replace().execute()
+    try:
+        wallet = PiWallet.get(
+            PiWallet.pass_phrase == phrase
+        )
+        wallet.balance = balance
+        wallet.last_update = datetime.now()
+        wallet.save()
+    except:
+        logger.info("Wallet doesn't exist, creating one")
+        PiWallet.create(
+            balance = balance,
+            pass_phrase = phrase
+        )
+        
+        
+def get_wallet_account() -> PiAccount:
+    account  = PiAccount.select().where(PiAccount.last_used < datetime.now() - timedelta(days=1)).get()
+    account.last_used = datetime.now()
+    account.save()
+    print(f"Account : {account}")
+    return account

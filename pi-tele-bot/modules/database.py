@@ -18,7 +18,7 @@ class TeleUser(Model):
 class PiAccount(Model):
     phone = CharField()
     password = CharField()
-    
+    last_used =  DateTimeField(default=datetime.now())
     class Meta:
         database = db
     
@@ -31,9 +31,3 @@ class PiWallet(Model):
     class Meta:
         database = db
     
-class PhoneNumber(Model):
-    phone = CharField()
-    last_used = DateTimeField()
-
-    class Meta:
-        database = db
