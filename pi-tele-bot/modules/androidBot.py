@@ -175,6 +175,8 @@ class AndroidBot():
                 return "error"
             if "An error" in page:
                 error_check += 1
+            if "Invalid" in page:
+                error_check += 1
             if "This is your identity on the Pi Blockchain" in self.driver.page_source:
                 self.verify_wallet()
         if "An error" in page:
@@ -197,7 +199,7 @@ class AndroidBot():
                 result = True
             except:
                 logger.error("Unable to sign out")
-            sleep(0.5)
+            sleep(0.3)
         
     def open_profile_page(self) -> None:
         logger.debug("Opening profile page")
@@ -289,7 +291,7 @@ class AndroidBot():
             self.driver.tap([(110,200)])
             sleep(0.3)
             self.driver.flick(100,300,100,200)
-            sleep(1)
+            sleep(0.5)
             self.driver.tap([(150,620)])
             current_tries = 0
             result = False
