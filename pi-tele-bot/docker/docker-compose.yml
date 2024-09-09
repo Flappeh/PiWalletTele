@@ -1,0 +1,35 @@
+services:
+  pi-wallet-bot:
+    image: pi-wallet-bot:1.0.1
+    restart: always
+    environment:
+      - TOKEN=7217378842:AAGipq5KCagsO6G-fhhiiVrhfWgxgmB9JDk
+      - BOT_USERNAME=@pi_wallet_monitor_bot
+      - BLOCKCHAIN_URI=https://api.mainnet.minepi.com
+      - PYPPETEER_CHROMIUM_REVISION=1263111
+      - ANDROID_SERVER_URL=http://192.168.18.221:4723
+    volumes:
+      - ./data:/bot/data
+    # networks:
+    #   - appium
+  appium-server:
+    image: appium/appium
+    container_name: appium-server
+    ports:
+      - 4723:4723
+    network_mode: host
+    privileged: true
+    restart: always
+    # networks:
+    #   - appium
+    volumes:
+      - /home/flappeh/.android:/home/androidusr/.android
+    environment:
+      - REMOTE_ADB=true
+      - ANDROID_DEVICES=localhost:5555
+      - REMOTE_ADB_POLLING_SEC=30
+      - APPIUM_ADDITIONAL_PARAMS=--relaxed-security --allow-insecure chromedriver_autodownload --allow-insecure adb_shell(venv)
+# networks:
+#   appium:
+#     driver: bridge
+#     external: true

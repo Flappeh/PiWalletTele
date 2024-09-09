@@ -17,25 +17,25 @@ def check_time(update: Update) -> bool:
         return True
     return False
 
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if check_time(update):
-        return
-    keyboard = [
-        [
-            InlineKeyboardButton("Help", callback_data="help"),
-        ],
-        [
-            InlineKeyboardButton("Check Wallet", callback_data="check_wallet"),
-            InlineKeyboardButton("Check Phrase", callback_data="check_phrase"),
-        ],
-        [InlineKeyboardButton("Administration", callback_data="admin")],
-    ]
+# async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+#     if check_time(update):
+#         return
+#     keyboard = [
+#         [
+#             InlineKeyboardButton("Help", callback_data="help"),
+#         ],
+#         [
+#             InlineKeyboardButton("Check Wallet", callback_data="check_wallet"),
+#             InlineKeyboardButton("Check Phrase", callback_data="check_phrase"),
+#         ],
+#         [InlineKeyboardButton("Administration", callback_data="admin")],
+#     ]
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
+#     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text("*Pi Wallet Bot 2024*\n\n Silahkan pilih command", 
-                                    reply_markup=reply_markup,
-                                    parse_mode=ParseMode.MARKDOWN_V2)
+#     await update.message.reply_text("*Pi Wallet Bot 2024*\n\n Silahkan pilih command", 
+#                                     reply_markup=reply_markup,
+#                                     parse_mode=ParseMode.MARKDOWN_V2)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query:
@@ -43,7 +43,20 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         if check_time(update):
             return
-        await update.message.reply_text("This is the help Text")
+        await update.message.reply_text("""
+*Pi Wallet Bot*
+
+Command yang dapat dilakukan:
+
+/help \\-\\> Show command ini
+
+/phrase *<24\\-phrase\\>* \\-\\> Perintah bot untuk search wallet berdasarkan 24 word phrase
+
+/wallet *<public\\-key\\>* \\-\\> Perintah bot untuk search wallet berdasarkan public key
+
+/change \\-\\> *Ganti user* Pi Account
+""",
+    parse_mode=ParseMode.MARKDOWN_V2)
 
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Parses the CallbackQuery and updates the message text."""
@@ -118,6 +131,7 @@ async def proses_phrase(proses_message, context: ContextTypes.DEFAULT_TYPE, phra
 
 *Phrase*: 
 {phrase}
+
 *Jumlah wallet*: 
 {data}
         """
@@ -128,6 +142,7 @@ async def proses_phrase(proses_message, context: ContextTypes.DEFAULT_TYPE, phra
 
 *Phrase*: 
 {phrase}
+
 *Jumlah wallet*: 
 {data}
         """
@@ -147,7 +162,12 @@ async def from_passphrase_command(update: Update, context: ContextTypes.DEFAULT_
     proses_message = await update.message.reply_text("Sedang memproses request...",reply_to_message_id=update.message.id)
     data = await proses_phrase(proses_message,context,phrase)
     data = data.replace('.', '\\.').replace('!','\\!')
-    await context.bot.edit_message_text(text=data,chat_id=proses_message.chat_id,message_id=proses_message.id,parse_mode=ParseMode.MARKDOWN_V2)
+    await context.bot.edit_message_text(
+        text=data,
+        chat_id=proses_message.chat_id,
+        message_id=proses_message.id,
+        parse_mode=ParseMode.MARKDOWN_V2
+    )
     
 
 # async def print_page_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -217,7 +237,7 @@ if __name__ == "__main__":
     app = Application.builder().token(TOKEN).build()
     logger.info("INITIALIZING Telegram Pi Wallet Bot")
     # Command
-    app.add_handler(CommandHandler('start', start_command))
+    # app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('help', help_command))
     app.add_handler(CommandHandler('wallet', from_wallet_command))
     app.add_handler(CommandHandler('phrase', from_passphrase_command))
