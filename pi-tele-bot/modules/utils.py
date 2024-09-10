@@ -47,3 +47,7 @@ def get_wallet_account() -> PiAccount:
     account.save()
     print(f"Account : {account}")
     return account
+
+def delete_wallet_account(account: PiAccount):
+    PiAccount.delete(account)
+

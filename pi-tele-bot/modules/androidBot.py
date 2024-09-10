@@ -3,12 +3,15 @@ from typing import Dict, Any
 from appium.options.common.base import AppiumOptions
 from appium.webdriver.common.appiumby import AppiumBy
 from appium.webdriver.webelement import WebElement
-from .environment import ANDROID_SERVER_URL
-from .utils import get_logger, store_phrase, get_wallet_account
+from .environment import ANDROID_SERVER_URL, TIMEOUT_LIMIT
+from .utils import get_logger, store_phrase, get_wallet_account, PiAccount, delete_wallet_account
 from .exceptions import PiAccountError
-from time import sleep
+from time import sleep,time
+from multiprocessing import Process, Queue
 
+TIMEOUT = TIMEOUT_LIMIT
 logger = get_logger(__name__)
+running_bot = []
 
 capabilities: Dict[str, Any] = {
     "platformName": "Android",
@@ -23,6 +26,7 @@ class AndroidBot():
     def __init__(self) -> None:
         self.driver: webdriver.Remote = webdriver.Remote(ANDROID_SERVER_URL, options=AppiumOptions().load_capabilities(capabilities))
         self.current_page = ""
+        self.age = time()
         
     def click_update(self) -> None:
         try:
@@ -40,13 +44,14 @@ class AndroidBot():
             notif.click()
         except:
             pass
+
     def verify_wallet(self) -> None:
         try:
             logger.debug("Verifying wallet ownership")
             self.driver.find_element(by=AppiumBy.XPATH, value="//android.widget.Button[contains(@text,'Continue')]").click()
-            print("Done clicking")
         except:
             logger.warning("Unable to verify")
+
     def check_is_loading(self):
         loading_screen = self.driver.find_element(by=AppiumBy.XPATH, value='//*[@text="Loading..."]')
         if loading_screen:
@@ -92,7 +97,7 @@ class AndroidBot():
             current_page = self.check_current_page()
         try:
             logger.debug("Trying to get available balance")
-            balance = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Available Bal")]/following-sibling::android.widget.TextView[2]')
+            balance = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text," Pi")][1]')
             return balance.text
         except Exception as e:
             logger.error(f"Error checking curent balance, error : {e}")
@@ -136,16 +141,15 @@ class AndroidBot():
                 case "home":
                     self.open_wallet_sub_page()
                 case "loading":
-                    print("Loading")
+                    logger.debug("Still loading")
                 case "notification":
-                    print("Notification Found")
+                    logger.debug("Notification Found")
                 case "update":
-                    print("Update notification found")
+                    logger.debug("Update notification found")
                 case "verification":
-                    print("Start verifying")
                     self.verify_wallet()
                 case _:
-                    print("Undefined")
+                    logger.warning("Got undefined while navigating to wallet home")
             current_page = self.check_current_page()
             logger.debug(f"Current page after match: {current_page}")  # Debugging line
     
@@ -222,18 +226,12 @@ class AndroidBot():
         self.driver.press_keycode(43)
         self.driver.press_keycode(42)
     
-    
-    def login_with_phone_number(self) -> bool:
+    def insert_phone_number(self, account: PiAccount)-> bool:
         try:
-            logger.debug("Getting new wallet account")
-            account = get_wallet_account()
-        except:
-            logger.error("Error getting new wallet account")
-            return False
-        try:
-            logger.debug("Logging in with new phone number")
-            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "with phone number")]').click()
-            sleep(0.2)
+            logger.debug("Inserting phone number")
+            while "Register with phone number" not in self.driver.page_source:
+                self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "with phone number")]').click()
+                sleep(0.2)
             country_box = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "United States")]')
             country_box.click()
             sleep(0.2)
@@ -244,15 +242,41 @@ class AndroidBot():
             phone_box.send_keys(account.phone)
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Submit")]').click()
             sleep(0.5)
-            password_box = self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.EditText')
-            password_box.send_keys(account.password)
-            self.driver.hide_keyboard()
-            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Submit")]').click()
+            return True
+        except:
+            logger.error("Error inserting phone number")
+            return False
+    
+    def enter_phone_number(self, account: PiAccount) -> bool:
+        try:
+            while "Enter your password" in self.driver.page_source:
+                logger.debug("Trying to insert phone number")
+                password_box = self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.EditText')
+                password_box.send_keys(account.password)
+                self.driver.hide_keyboard()
+                self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Submit")]').click()
+                sleep(0.5)
+            return True
+        except:
+            logger.error("Error inserting phone number")
+          
+    def login_with_phone_number(self) -> bool:
+        try:
+            logger.debug("Getting new wallet account")
+            account = get_wallet_account()
+        except:
+            logger.error("Error getting new wallet account")
+            return False
+        try:
+            logger.debug("Logging in with new phone number")
+            self.insert_phone_number(account)
+            self.enter_phone_number(account)
             while "Enter your password" in self.driver.page_source:
                 logger.warning("Still in password form")
                 self.driver.hide_keyboard()
                 if "Invalid phone number" in self.driver.page_source:
                     self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Return to login")]').click()
+                    delete_wallet_account(account)
                     return False
             return True
         except Exception as e:
@@ -274,6 +298,7 @@ class AndroidBot():
                 if "Mining Session Ends" in self.driver.page_source:
                     self.driver.tap([(40,50)])
                     break
+                sleep(0.2)
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Not Now")]').click()
             self.driver.tap([(50,350)])
         except:
@@ -291,19 +316,24 @@ class AndroidBot():
             self.driver.tap([(110,200)])
             sleep(0.3)
             self.driver.flick(100,300,100,200)
-            sleep(0.5)
+            sleep(1)
             self.driver.tap([(150,620)])
             current_tries = 0
             result = False
             while current_tries < 5:
                 if "Welcome to the Pi Browser" in self.driver.page_source:
-                    print("Success")
+                    logger.debug("Successfully logged into browser")
+                    result = True
+                    break
+                if "Unlock Pi Wallet" in self.driver.page_source:
+                    logger.debug("Successfully logged into browser")
                     result = True
                     break
                 if "If above button doesn't" in self.driver.page_source:
                     self.driver.tap([(150,620)])
                 else:
                     sleep(1)
+                    current_tries += 1
             return result
         except:
             logger.error("Error logging in to pi browser")
@@ -319,7 +349,8 @@ class AndroidBot():
                 while login_result == False:
                     login_result = self.login_with_phone_number()
             self.navigate_to_pi_network()
-            self.login_to_browser()
+            if self.login_to_browser() == False:
+                self.change_user()
         except:
             logger.error("Error logging in user")
     
@@ -335,6 +366,8 @@ class AndroidBot():
             self.driver.tap([(20,50)])
             sleep(1)
             if "Chat" in self.driver.page_source and "Roles" in self.driver.page_source and "Referral" in self.driver.page_source:
+                return True
+            elif "Continue with phone" in self.driver.page_source or "Please verify your identity" in self.driver.page_source:
                 return True
             else:
                 return False
@@ -380,6 +413,8 @@ class AndroidBot():
                 i += 1
             if result == "ok":
                 self.check_current_page()
+            elif result == "error":
+                return "Error butuh ganti ke user lain"
             else:
                 return "Invalid passphrase given"
         else:
@@ -391,6 +426,10 @@ class AndroidBot():
     
     def open_wallet_after_error(self, pwd: str):
         self.change_user()
+        data = self.open_wallet_from_passphrase(pwd)
+        while data == "Error butuh ganti ke user lain":
+            self.change_user()
+            data = self.open_wallet_from_passphrase(pwd)
         return self.open_wallet_from_passphrase(pwd)
         
     def print_current_page(self):
@@ -398,10 +437,87 @@ class AndroidBot():
     
     def change_user_command(self) -> str:
         self.change_user()
-        
+    
+    def kill_all_apps(self) -> None:
+        self.driver.terminate_app('pi.browser')
+        self.driver.terminate_app('com.blockchainvault')
+       
     def __del__(self):
         logger.info("Finished running script")
         self.driver.quit()
-    
-    
 
+def get_running_bot():
+    if len(running_bot) != 0:
+        logger.debug("Found running bot")
+        bot: AndroidBot = running_bot[0]
+        if time() - bot.age > 4800:
+            logger.debug("Bot exceeds maximum time, creating a new one")
+            del bot
+        else:
+            return bot
+    logger.debug("Creating a new bot.")
+    bot = AndroidBot()
+    running_bot.append(bot)
+    logger.info(f"Running bot count : {len(running_bot)}")
+    return bot
+
+def process_phrase(phrase:str, result_queue : Queue):
+    try:
+        logger.debug("Starting new request for processing phrase")
+        bot = get_running_bot()
+        data = bot.open_wallet_from_passphrase(phrase)
+        result_queue.put(data)
+    except:
+        logger.error("Error processing phrase")
+
+def process_phrase_after_error(phrase:str, result_queue : Queue):
+    try:
+        logger.debug("Starting new request for processing phrase")
+        bot = get_running_bot()
+        data = bot.open_wallet_after_error(phrase)
+        result_queue.put(data)
+    except:
+        logger.error("Error processing phrase")
+
+def process_change_user():
+    try:
+        logger.debug("Starting new request for processing phrase")
+        bot = get_running_bot()
+        data = bot.change_user_command()
+        return data
+    except:
+        logger.error("Error processing phrase")
+
+def kill_all_apps():
+    bot = get_running_bot()
+    bot.kill_all_apps()
+    del bot
+
+def start_background_process(target: Any, phrase: str = None):
+    START_TIME = time()
+    current_process = None
+    if phrase:
+        result = Queue()
+        current_process = Process(target=target, args=(phrase,result))
+    else:
+        current_process = Process(target=target)
+    current_process.start()
+    while time() - START_TIME <= TIMEOUT:
+        if not current_process.is_alive():
+            break
+        sleep(1)
+    else:
+        current_process.terminate()
+        kill_all_apps()
+        current_process.join()
+        return "timeout"
+    return result.get()
+    
+def start_bot_phrase_process(phrase:str):
+    return start_background_process(process_phrase, phrase)
+
+def start_change_user_process():
+    return start_background_process(process_change_user)
+
+def start_phrase_process_after_error(phrase:str):
+    return start_background_process(process_phrase_after_error,phrase)

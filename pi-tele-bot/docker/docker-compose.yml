@@ -1,6 +1,6 @@
 services:
   pi-wallet-bot:
-    image: pi-wallet-bot:1.0.1
+    image: pi-wallet-bot:1.1.1
     restart: always
     environment:
       - TOKEN=7217378842:AAGipq5KCagsO6G-fhhiiVrhfWgxgmB9JDk

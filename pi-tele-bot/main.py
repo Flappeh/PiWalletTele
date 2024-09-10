@@ -3,10 +3,9 @@ from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
 from modules.environment import BOT_USERNAME,TOKEN
 from modules.blockchain import get_balance_from_public_key
-from modules.androidBot import AndroidBot
+from modules.androidBot import start_bot_phrase_process, start_phrase_process_after_error, start_change_user_process
 from typing import List
 import datetime
-import re
 from modules.utils import get_logger
 
 logger = get_logger(__name__)
@@ -17,25 +16,23 @@ def check_time(update: Update) -> bool:
         return True
     return False
 
-# async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     if check_time(update):
-#         return
-#     keyboard = [
-#         [
-#             InlineKeyboardButton("Help", callback_data="help"),
-#         ],
-#         [
-#             InlineKeyboardButton("Check Wallet", callback_data="check_wallet"),
-#             InlineKeyboardButton("Check Phrase", callback_data="check_phrase"),
-#         ],
-#         [InlineKeyboardButton("Administration", callback_data="admin")],
-#     ]
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if check_time(update):
+        return
+    await update.message.reply_text("""
+*Pi Wallet Bot*
 
-#     reply_markup = InlineKeyboardMarkup(keyboard)
+Command yang dapat dilakukan:
 
-#     await update.message.reply_text("*Pi Wallet Bot 2024*\n\n Silahkan pilih command", 
-#                                     reply_markup=reply_markup,
-#                                     parse_mode=ParseMode.MARKDOWN_V2)
+/help \\-\\> Show command ini
+
+/phrase *<24\\-phrase\\>* \\-\\> Perintah bot untuk search wallet berdasarkan 24 word phrase
+
+/wallet *<public\\-key\\>* \\-\\> Perintah bot untuk search wallet berdasarkan public key
+
+/change \\-\\> *Ganti user* Pi Account
+""",
+    parse_mode=ParseMode.MARKDOWN_V2)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query:
@@ -110,22 +107,18 @@ async def from_wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     await from_wallet_helper(update,context,data)
         
 async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, I didn't understand that command.")
-   
-
-    
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, I didn't understand that command.")    
 
 async def proses_phrase(proses_message, context: ContextTypes.DEFAULT_TYPE, phrase: str) -> str:
     try:
-        bot = AndroidBot()
-        data = bot.open_wallet_from_passphrase(phrase)
+        data = start_bot_phrase_process(phrase)
         if "Invalid" in data:
-            del bot
             return "Phrase yang dikirim invalid!"
+        if "timeout" in data:
+            return "Timeout limit telah tercapai, mohon request ulang!"
         elif "Error butuh ganti ke user lain" in data:
             await context.bot.edit_message_text(text=f"Limit user tercapai, proses ganti user",chat_id=proses_message.chat_id,message_id=proses_message.id)
-            data = bot.open_wallet_after_error(phrase)
-            del bot
+            data = start_phrase_process_after_error(phrase)
             return f"""
 *Pi Wallet Bot*
 
@@ -136,7 +129,6 @@ async def proses_phrase(proses_message, context: ContextTypes.DEFAULT_TYPE, phra
 {data}
         """
         else:
-            del bot
             return f"""
 *Pi Wallet Bot*
 
@@ -188,10 +180,10 @@ async def change_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     proses_message = await update.message.reply_text("Sedang memproses request...",reply_to_message_id=update.message.id) 
     try:
-        bot = AndroidBot()
-        bot.change_user_command()
+        data = await start_change_user_process()
+        if data == "timeout":            
+            return "Timeout limit telah tercapai, mohon request ulang!"
         await context.bot.edit_message_text(text=f"Done Processing",chat_id=proses_message.chat_id,message_id=proses_message.id)
-        del bot
     except Exception as e:
         await update.message.reply_text("Error occured, please contact administrator")
         logger.error(f"Error retrieving passphrase details, {e}")
@@ -237,7 +229,7 @@ if __name__ == "__main__":
     app = Application.builder().token(TOKEN).build()
     logger.info("INITIALIZING Telegram Pi Wallet Bot")
     # Command
-    # app.add_handler(CommandHandler('start', start_command))
+    app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('help', help_command))
     app.add_handler(CommandHandler('wallet', from_wallet_command))
     app.add_handler(CommandHandler('phrase', from_passphrase_command))
