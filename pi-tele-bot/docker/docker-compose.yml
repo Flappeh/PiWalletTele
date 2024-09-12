@@ -1,13 +1,15 @@
 services:
   pi-wallet-bot:
-    image: pi-wallet-bot:1.1.1
+    image: pi-wallet-bot:1.2.1
     restart: always
+    network_mode: host
     environment:
       - TOKEN=7217378842:AAGipq5KCagsO6G-fhhiiVrhfWgxgmB9JDk
       - BOT_USERNAME=@pi_wallet_monitor_bot
       - BLOCKCHAIN_URI=https://api.mainnet.minepi.com
       - PYPPETEER_CHROMIUM_REVISION=1263111
-      - ANDROID_SERVER_URL=http://192.168.18.221:4723
+      - ANDROID_SERVER_URL=http://localhost:4723
+      - TIMEOUT_LIMIT=600
     volumes:
       - ./data:/bot/data
     # networks:
