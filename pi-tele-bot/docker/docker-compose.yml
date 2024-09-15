@@ -12,8 +12,6 @@ services:
       - TIMEOUT_LIMIT=600
     volumes:
       - ./data:/bot/data
-    # networks:
-    #   - appium
   appium-server:
     image: appium/appium
     container_name: appium-server
