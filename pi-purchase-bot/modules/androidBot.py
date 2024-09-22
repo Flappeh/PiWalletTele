@@ -422,6 +422,7 @@ class AndroidBot():
             logger.error("Error opening pay/request page!")
     
     def start_transaction(self, pwd:str, amount:float):
+        self.open_wallet_from_passphrase(pwd)
         self.open_pay_page()
         self.enter_send_amount(amount)
         self.enter_wallet_address()

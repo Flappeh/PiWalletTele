@@ -1,6 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler, CallbackContext, ConversationHandler
 from modules.environment import BOT_USERNAME,TOKEN
 from modules.blockchain import get_balance_from_public_key
 from modules.androidBot import start_bot_phrase_process, start_phrase_process_after_error, start_change_user_process, process_transaction
@@ -11,10 +11,27 @@ from modules.utils import get_logger
 logger = get_logger(__name__)
 # Commands
 
+# State for scheduler_input
+PHRASE, TIME, AMOUNT = range(3)
+
 def check_time(update: Update) -> bool:
     if update.message.date.timestamp() < datetime.datetime.now().timestamp() - 600:
         return True
     return False
+
+def validate_datetime(message: str):
+    try:
+        data = datetime.datetime.strptime(message, "%d-%m-%Y:%H:%M:%S")
+        return True, data
+    except:
+        return False, None
+
+def validate_amount(message: str):
+    try:
+        data = float(message)
+        return True, data
+    except:
+        return False, None
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if check_time(update):
@@ -110,22 +127,55 @@ async def from_wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         data = context.args    
     await from_wallet_helper(update,context,data)
 
-async def schedule_transaction_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def schedule_transaction_command(update: Update, context: CallbackContext):
     if check_time(update):
         return
-    message = await context.bot.send_message(chat_id=update.effective_chat.id, text="24 phrase wallet")
+    await update.message.reply_text("Enter 24 phrase wallet")
+    return PHRASE
+
+async def schedule_get_phrase(update: Update, context: CallbackContext) -> int:
+    data = update.message.text.split()
+    if len(data) != 24:
+        await update.message.reply_text("Phrase harus 24 kata!, silahkan kirim ulang.")
+        return PHRASE
+    context.user_data['phrase'] = update.message.text
+    await update.message.reply_text('Kapan waktu transaksi dilakukan \n(Format : "Tanggal-Bulan-Tahun:Jam:Menit:Detik" )\n Contoh : 01-01-2024:12:30:36')
+    return TIME
+
+async def schedule_get_time(update:Update, context: CallbackContext) -> int:
+    result, time_data = validate_datetime(update.message.text)
+    if result == False:
+        await update.message.reply_text("Format tidak dikenal, coba lagi.\nContoh : 01-01-2024:12:30:36")
+        return TIME
+    context.user_data['time'] = time_data
+    await update.message.reply_text("Berapa nominal yang ingin dikirim")
+    return AMOUNT
+
+async def schedule_get_amount(update:Update, context: CallbackContext) -> int:
+    result, amount = validate_amount(update.message.text)
+    if result == False:
+        await update.message.reply_text("Invalid amount, coba lagi.")
+        return AMOUNT
+    context.user_data['amount'] = amount
+    user_data = context.user_data
+    await update.message.reply_text(f"""
+Terima kasih. Berikut info yang diterima
+
+Phrase : {user_data['phrase']}
+
+Waktu : {user_data['time']}
+
+Jumlah coin : {user_data['amount']}
+
+""")
+    await process_transaction(user_data['phrase'],user_data['amount'])
+    return ConversationHandler.END
+
+
+async def cancel(update: Update, context: CallbackContext) -> int:
+    await update.message.reply_text("Canceled interaction")
+    return ConversationHandler.END
     
-    query = update.callback_query
-    
-    await query.answer()
-    try:
-        await query.delete_message()
-        wallet = query.data
-        print(wallet)
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Data yang diterima: \n {wallet}")
-    except:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Error scheduling transaction")
-        
 async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, I didn't understand that command.")    
 
@@ -181,20 +231,6 @@ async def from_passphrase_command(update: Update, context: ContextTypes.DEFAULT_
         parse_mode=ParseMode.MARKDOWN_V2
     )
     
-
-# async def print_page_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     if check_time(update):
-#         return
-#     proses_message = await update.message.reply_text("Sedang memproses request...",reply_to_message_id=update.message.id) 
-#     try:
-#         bot = AndroidBot()
-#         data = bot.print_current_page()
-#         print(data)
-#         await context.bot.edit_message_text(text=f"Done",chat_id=proses_message.chat_id,message_id=proses_message.id)
-#     except Exception as e:
-#         await update.message.reply_text("Error occured, please contact administrator")
-#         logger.error(f"Error retrieving passphrase details, {e}")
-
 async def change_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if check_time(update):
         return
@@ -248,15 +284,25 @@ async def handle_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if __name__ == "__main__":
     app = Application.builder().token(TOKEN).build()
     logger.info("INITIALIZING Telegram Pi Wallet Bot")
+    
+    conv_handler =  ConversationHandler(
+        entry_points=[CommandHandler('schedule', schedule_transaction_command)],
+        states={
+            PHRASE: [MessageHandler(filters.TEXT & ~filters.COMMAND, schedule_get_phrase)],
+            TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, schedule_get_time)],
+            AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, schedule_get_amount)],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
     # Command
     app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('help', help_command))
     app.add_handler(CommandHandler('wallet', from_wallet_command))
     app.add_handler(CommandHandler('phrase', from_passphrase_command))
     app.add_handler(CommandHandler('change', change_user_command))
-    app.add_handler(CommandHandler('schedule', schedule_transaction_command))
     # app.add_handler(CommandHandler('print', print_page_command))
     app.add_handler(CallbackQueryHandler(button))
+    app.add_handler(conv_handler)
     
     # Messages
     app.add_handler(MessageHandler(filters.TEXT, handle_message))
