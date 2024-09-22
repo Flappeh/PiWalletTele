@@ -30,4 +30,11 @@ class PiWallet(Model):
     last_update = DateTimeField(default=datetime.now())
     class Meta:
         database = db
+        
+class Schedule(Model):
+    pass_phrase = CharField(null = True)
+    amount = FloatField(default=0)
+    schedule = DateTimeField(default=datetime.now())
+    class Meta:
+        database = db
     

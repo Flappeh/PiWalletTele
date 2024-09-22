@@ -3,7 +3,7 @@ from typing import Dict, Any
 from appium.options.common.base import AppiumOptions
 from appium.webdriver.common.appiumby import AppiumBy
 from appium.webdriver.webelement import WebElement
-from .environment import ANDROID_SERVER_URL, TIMEOUT_LIMIT
+from .environment import ANDROID_SERVER_URL, TIMEOUT_LIMIT, WALLET_DEST
 from .utils import get_logger, store_phrase, get_wallet_account, PiAccount, delete_wallet_account
 from .exceptions import PiAccountError
 from time import sleep,time
@@ -392,7 +392,40 @@ class AndroidBot():
             logger.debug("Not in profile page")
             self.open_profile_page()
             self.start_login_user()
-        
+    
+    def enter_wallet_address(self):
+        try:
+            logger.debug("Entering wallet address")
+            wallet_box = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Type in a wallet")]')
+            wallet_box.send_keys(WALLET_DEST)
+            self.driver.hide_keyboard()
+        except:
+            logger.error("Unable to enter receiver wallet address")
+    def enter_send_amount(self, amount:float):
+        try:
+            logger.debug("Entering send amount")
+            amount_box = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value='new UiSelector().className("android.widget.EditText").instance(0)')
+            amount_box.send_keys(amount)
+            self.driver.hide_keyboard()
+        except:
+            logger.error("Error entering send amount")
+            
+    def open_pay_page(self):
+        try:
+            logger.debug("Opening Pay/Request Page")
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Pay / Request")]').click()
+            while "Manually Add Wallet Address" not in self.driver.page_source:
+                logger.debug("Waiting for entering wallet address manually")
+                sleep(0.2)
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Manually Add Wallet Address")]').click()
+        except:
+            logger.error("Error opening pay/request page!")
+    
+    def start_transaction(self, pwd:str, amount:float):
+        self.open_pay_page()
+        self.enter_send_amount(amount)
+        self.enter_wallet_address()
+    
     def open_wallet_from_passphrase(self, pwd: str):
         self.driver.activate_app('pi.browser/com.pinetwork.MainActivity')
         logger.info(f"Received new request for phrase: {pwd}")
@@ -479,6 +512,14 @@ def process_phrase_after_error(phrase:str, result_queue : Queue):
     except:
         logger.error("Error processing phrase")
 
+def process_transaction(phrase:str, amount:float):
+    try:
+        logger.debug("Starting a new transaction")
+        bot = get_running_bot()
+        bot.start_transaction(phrase,amount)
+    except:
+        logger.error("Error processing transaction")
+        
 def process_change_user():
     try:
         logger.debug("Starting new request for processing phrase")

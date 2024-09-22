@@ -3,7 +3,7 @@ from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
 from modules.environment import BOT_USERNAME,TOKEN
 from modules.blockchain import get_balance_from_public_key
-from modules.androidBot import start_bot_phrase_process, start_phrase_process_after_error, start_change_user_process
+from modules.androidBot import start_bot_phrase_process, start_phrase_process_after_error, start_change_user_process, process_transaction
 from typing import List
 import datetime
 from modules.utils import get_logger
@@ -30,6 +30,8 @@ Command yang dapat dilakukan:
 
 /wallet *<public\\-key\\>* \\-\\> Perintah bot untuk search wallet berdasarkan public key
 
+/schedule *<24\\-phrase\\>* *<Jumlah\\Coin\\>* *<Waktu\\-Transaksi\\>*   \\-\\> Perintah bot untuk kirim coin dari wallet yang disediakan
+
 /change \\-\\> *Ganti user* Pi Account
 """,
     parse_mode=ParseMode.MARKDOWN_V2)
@@ -50,6 +52,8 @@ Command yang dapat dilakukan:
 /phrase *<24\\-phrase\\>* \\-\\> Perintah bot untuk search wallet berdasarkan 24 word phrase
 
 /wallet *<public\\-key\\>* \\-\\> Perintah bot untuk search wallet berdasarkan public key
+
+/schedule *<24\\-phrase\\>* *<Jumlah\\Coin\\>* *<Waktu\\-Transaksi\\>*   \\-\\> Perintah bot untuk kirim coin dari wallet yang disediakan
 
 /change \\-\\> *Ganti user* Pi Account
 """,
@@ -105,6 +109,22 @@ async def from_wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             return
         data = context.args    
     await from_wallet_helper(update,context,data)
+
+async def schedule_transaction_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if check_time(update):
+        return
+    message = await context.bot.send_message(chat_id=update.effective_chat.id, text="24 phrase wallet")
+    
+    query = update.callback_query
+    
+    await query.answer()
+    try:
+        await query.delete_message()
+        wallet = query.data
+        print(wallet)
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Data yang diterima: \n {wallet}")
+    except:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="Error scheduling transaction")
         
 async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, I didn't understand that command.")    
@@ -234,6 +254,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler('wallet', from_wallet_command))
     app.add_handler(CommandHandler('phrase', from_passphrase_command))
     app.add_handler(CommandHandler('change', change_user_command))
+    app.add_handler(CommandHandler('schedule', schedule_transaction_command))
     # app.add_handler(CommandHandler('print', print_page_command))
     app.add_handler(CallbackQueryHandler(button))
     
