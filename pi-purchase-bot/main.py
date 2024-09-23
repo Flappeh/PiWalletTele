@@ -22,6 +22,8 @@ def check_time(update: Update) -> bool:
 def validate_datetime(message: str):
     try:
         data = datetime.datetime.strptime(message, "%d-%m-%Y:%H:%M:%S")
+        if data.timestamp() < datetime.datetime.now().timestamp() + 3600:
+            return False, data
         return True, data
     except:
         return False, None
@@ -144,8 +146,11 @@ async def schedule_get_phrase(update: Update, context: CallbackContext) -> int:
 
 async def schedule_get_time(update:Update, context: CallbackContext) -> int:
     result, time_data = validate_datetime(update.message.text)
-    if result == False:
+    if result == False and time_data == None:
         await update.message.reply_text("Format tidak dikenal, coba lagi.\nContoh : 01-01-2024:12:30:36")
+        return TIME
+    elif result == False and time_data:
+        await update.message.reply_text("Waktu yang dikirim minimal satu jam ke depan")
         return TIME
     context.user_data['time'] = time_data
     await update.message.reply_text("Berapa nominal yang ingin dikirim")

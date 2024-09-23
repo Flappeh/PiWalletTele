@@ -393,14 +393,39 @@ class AndroidBot():
             self.open_profile_page()
             self.start_login_user()
     
+    def start_send_coin(self):
+        res = False
+        try:
+            self.driver.tap([(180,420)])
+            sleep(0.1)
+            self.driver.tap([(180,500)])
+            sleep(0.1)
+            self.driver.tap([(180,420)])
+            sleep(0.1)
+            # if "Memo (optional)" in self.driver.page_source:
+            #     self.driver.find_element(by=AppiumBy.XPATH, value='//*[@text="Send"]').click()
+            # if "Do you recognize" in self.driver.page_source:
+            #     self.driver.find_element(by=AppiumBy.XPATH, value='//*[@text="Confirm"]').click()
+            # if "Error!" in self.driver.page_source:
+            #     self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Close")]').click()
+            return res
+        except:
+            return res
+            
+    
+    def scroll_to_bottom(self):
+        sleep(0.5)
+        self.driver.flick(100,500,100,200)
+    
     def enter_wallet_address(self):
         try:
             logger.debug("Entering wallet address")
-            wallet_box = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Type in a wallet")]')
-            wallet_box.send_keys(WALLET_DEST)
+            element = self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.EditText[contains(@resource-id, "mui")]')
+            element.send_keys(WALLET_DEST)
             self.driver.hide_keyboard()
         except:
             logger.error("Unable to enter receiver wallet address")
+            
     def enter_send_amount(self, amount:float):
         try:
             logger.debug("Entering send amount")
@@ -426,6 +451,12 @@ class AndroidBot():
         self.open_pay_page()
         self.enter_send_amount(amount)
         self.enter_wallet_address()
+        self.scroll_to_bottom()
+        current_time = time()
+        logger.debug("Start sending coin")
+        result = False
+        while (time() < current_time + 30) and result == False:
+            self.start_send_coin()
     
     def open_wallet_from_passphrase(self, pwd: str):
         self.driver.activate_app('pi.browser/com.pinetwork.MainActivity')
