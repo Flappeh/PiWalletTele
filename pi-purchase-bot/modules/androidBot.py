@@ -60,6 +60,13 @@ class AndroidBot():
             return True
         return False
 
+    def click_back_button(self):
+        try:
+            logger.debug("Clicking back button")
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[@resource-id="address-bar-back-button"]').click()
+        except:
+            logger.error("Error clicking back button")
+    
     def check_current_page(self):
         Page_Source = self.driver.page_source
         if "Welcome to the Pi Browser" in Page_Source:
@@ -82,6 +89,14 @@ class AndroidBot():
         if "Translation loading ..." in Page_Source:
             self.click_update()
             return "update"
+        if "Pay or Request" in Page_Source:
+            return "transfer"
+        if "Manually Add Wallet Address" in Page_Source:
+            return "transfer"
+        if "You are about to send" in Page_Source:
+            return "transfer"
+        if "Error!" in Page_Source:
+            return "transfer"
         return ""
 
     def check_current_wallet_balance(self):
@@ -148,6 +163,8 @@ class AndroidBot():
                     logger.debug("Update notification found")
                 case "verification":
                     self.verify_wallet()
+                case "transfer":
+                    self.click_back_button()
                 case _:
                     logger.warning("Got undefined while navigating to wallet home")
             current_page = self.check_current_page()

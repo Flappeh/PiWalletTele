@@ -1,12 +1,15 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler, CallbackContext, ConversationHandler
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler, CallbackContext, ConversationHandler, Defaults
 from modules.environment import BOT_USERNAME,TOKEN
 from modules.blockchain import get_balance_from_public_key
 from modules.androidBot import start_bot_phrase_process, start_phrase_process_after_error, start_change_user_process, process_transaction
 from typing import List
 import datetime
 from modules.utils import get_logger
+import random
+import string
+import pytz
 
 logger = get_logger(__name__)
 # Commands
@@ -22,8 +25,8 @@ def check_time(update: Update) -> bool:
 def validate_datetime(message: str):
     try:
         data = datetime.datetime.strptime(message, "%d-%m-%Y:%H:%M:%S")
-        if data.timestamp() < datetime.datetime.now().timestamp() + 3600:
-            return False, data
+        # if data.timestamp() < datetime.datetime.now().timestamp() + 3600:
+        #     return False, data
         return True, data
     except:
         return False, None
@@ -156,6 +159,13 @@ async def schedule_get_time(update:Update, context: CallbackContext) -> int:
     await update.message.reply_text("Berapa nominal yang ingin dikirim")
     return AMOUNT
 
+async def run_transaction_job(context: ContextTypes.DEFAULT_TYPE):
+    job = context.job
+    data = job.data
+    await context.bot.send_message(job.chat_id, text=f"Job {job.name} mulai!")
+    await process_transaction(data['phrase'], data['amount'])
+    await context.bot.send_message(job.chat_id, text=f"Selesai menjalankan schedule {job.name}")
+
 async def schedule_get_amount(update:Update, context: CallbackContext) -> int:
     result, amount = validate_amount(update.message.text)
     if result == False:
@@ -173,7 +183,14 @@ Waktu : {user_data['time']}
 Jumlah coin : {user_data['amount']}
 
 """)
-    await process_transaction(user_data['phrase'],user_data['amount'])
+    job_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    context.job_queue.run_once(
+        callback=run_transaction_job, 
+        chat_id= update.effective_chat.id,
+        data=user_data,
+        when=user_data['time'],
+        name=job_name
+        )
     return ConversationHandler.END
 
 
@@ -217,7 +234,6 @@ async def proses_phrase(proses_message, context: ContextTypes.DEFAULT_TYPE, phra
         logger.error(f"Error retrieving passphrase details, {e}")
         return "Error occured, please contact administrator"
 
-
 async def from_passphrase_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if check_time(update):
         return
@@ -248,6 +264,34 @@ async def change_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     except Exception as e:
         await update.message.reply_text("Error occured, please contact administrator")
         logger.error(f"Error retrieving passphrase details, {e}")
+
+def remove_job(name:str, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    current_jobs = context.job_queue.get_jobs_by_name(name)
+    if not current_jobs:
+        return False
+    for i in current_jobs:
+        i.schedule_removal()
+    return True
+
+async def remove_job_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if check_time(update):
+        return
+    data = context.args
+    if len(data) != 1:
+        await update.message.reply_text("Mohon kirim 1 job name per removal")
+        return
+    message = f"Berhasil remove job : {data[0]}" if remove_job(data[0]) else "Job yang di request tidak dikenal!"
+    await update.message.reply_text(message)
+       
+async def list_all_jobs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    jobs = context.job_queue.jobs()
+    message = 'Job List:'
+    if len(jobs) > 0:
+        for index,i in enumerate(jobs):
+            message += f'\n{index}. Name : {i.name}, Data : {i.data}'
+    else:
+        message += "\n No jobs availabile"
+    await update.message.reply_text(message)
 
 # Responses
 
@@ -287,7 +331,10 @@ async def handle_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
 
 if __name__ == "__main__":
-    app = Application.builder().token(TOKEN).build()
+    builder = Application.builder()
+    builder.token(TOKEN)
+    builder.defaults(Defaults(tzinfo=pytz.timezone('Asia/Jakarta')))
+    app = builder.build()
     logger.info("INITIALIZING Telegram Pi Wallet Bot")
     
     conv_handler =  ConversationHandler(
@@ -305,6 +352,8 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler('wallet', from_wallet_command))
     app.add_handler(CommandHandler('phrase', from_passphrase_command))
     app.add_handler(CommandHandler('change', change_user_command))
+    app.add_handler(CommandHandler('list_jobs', list_all_jobs_command))
+    app.add_handler(CommandHandler('del_job', remove_job_command))
     # app.add_handler(CommandHandler('print', print_page_command))
     app.add_handler(CallbackQueryHandler(button))
     app.add_handler(conv_handler)
@@ -314,7 +363,6 @@ if __name__ == "__main__":
     
     # Errors
     app.add_error_handler(handle_error)
-    
     logger.info("BOT RUNNING")
     app.run_polling(poll_interval=3)
     
