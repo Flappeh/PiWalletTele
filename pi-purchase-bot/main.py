@@ -3,10 +3,10 @@ from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler, CallbackContext, ConversationHandler, Defaults
 from modules.environment import BOT_USERNAME,TOKEN
 from modules.blockchain import get_balance_from_public_key
-from modules.androidBot import start_bot_phrase_process, start_phrase_process_after_error, start_change_user_process, process_transaction
+from modules.androidBot import start_bot_phrase_process, start_phrase_process_after_error, start_change_user_process, start_transaction_process
 from typing import List
-import datetime
-from modules.utils import get_logger
+from datetime import datetime, timedelta
+from modules.utils import get_logger, store_schedule, finish_schedule, get_all_schedule, check_schedule
 import random
 import string
 import pytz
@@ -18,14 +18,14 @@ logger = get_logger(__name__)
 PHRASE, TIME, AMOUNT = range(3)
 
 def check_time(update: Update) -> bool:
-    if update.message.date.timestamp() < datetime.datetime.now().timestamp() - 600:
+    if update.message.date.timestamp() < datetime.now().timestamp() - 600:
         return True
     return False
 
 def validate_datetime(message: str):
     try:
-        data = datetime.datetime.strptime(message, "%d-%m-%Y:%H:%M:%S")
-        # if data.timestamp() < datetime.datetime.now().timestamp() + 3600:
+        data = datetime.strptime(message, "%d-%m-%Y:%H:%M:%S")
+        # if data.timestamp() < datetime.now().timestamp() + 1800:
         #     return False, data
         return True, data
     except:
@@ -38,6 +38,25 @@ def validate_amount(message: str):
     except:
         return False, None
 
+async def run_transaction_job(context: ContextTypes.DEFAULT_TYPE):
+    job = context.job
+    data = job.data
+    await context.bot.send_message(job.chat_id, text=f"Job {job.name} mulai!")
+    start_transaction_process(data['phrase'], data['amount'])
+    finish_schedule(job.name)
+    await context.bot.send_message(job.chat_id, text=f"Selesai menjalankan schedule {job.name}")
+    
+async def schedule_job_run(update: Update, context: CallbackContext, user_data):
+    job_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
+    store_schedule(job_name=job_name, user_data=user_data,chat_id=update.effective_chat.id)
+    context.job_queue.run_once(
+        callback=run_transaction_job, 
+        chat_id= update.effective_chat.id,
+        data=user_data,
+        when=user_data['time'],
+        name=job_name
+        )
+    
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if check_time(update):
         return
@@ -153,23 +172,22 @@ async def schedule_get_time(update:Update, context: CallbackContext) -> int:
         await update.message.reply_text("Format tidak dikenal, coba lagi.\nContoh : 01-01-2024:12:30:36")
         return TIME
     elif result == False and time_data:
-        await update.message.reply_text("Waktu yang dikirim minimal satu jam ke depan")
+        await update.message.reply_text("Waktu yang dikirim minimal 30 menit dari saat ini")
         return TIME
-    context.user_data['time'] = time_data
+    # if check_schedule(time_data) == False:
+    #     await update.message.reply_text("Sudah ada schedule yang berjalan pada jam yang diberikan. Jika ingin cancel, /cancel")
+    #     return TIME
+    context.user_data['time'] = time_data - timedelta(minutes=3)
     await update.message.reply_text("Berapa nominal yang ingin dikirim")
     return AMOUNT
-
-async def run_transaction_job(context: ContextTypes.DEFAULT_TYPE):
-    job = context.job
-    data = job.data
-    await context.bot.send_message(job.chat_id, text=f"Job {job.name} mulai!")
-    await process_transaction(data['phrase'], data['amount'])
-    await context.bot.send_message(job.chat_id, text=f"Selesai menjalankan schedule {job.name}")
 
 async def schedule_get_amount(update:Update, context: CallbackContext) -> int:
     result, amount = validate_amount(update.message.text)
     if result == False:
         await update.message.reply_text("Invalid amount, coba lagi.")
+        return AMOUNT
+    if amount <= 0.2:
+        await update.message.reply_text("Amount minimal yang bisa dikirim adalah 0.3")
         return AMOUNT
     context.user_data['amount'] = amount
     user_data = context.user_data
@@ -178,24 +196,16 @@ Terima kasih. Berikut info yang diterima
 
 Phrase : {user_data['phrase']}
 
-Waktu : {user_data['time']}
+Waktu : {user_data['time'] + timedelta(minutes=3)}
 
 Jumlah coin : {user_data['amount']}
 
 """)
-    job_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-    context.job_queue.run_once(
-        callback=run_transaction_job, 
-        chat_id= update.effective_chat.id,
-        data=user_data,
-        when=user_data['time'],
-        name=job_name
-        )
+    await schedule_job_run(update, context, user_data)
     return ConversationHandler.END
 
-
 async def cancel(update: Update, context: CallbackContext) -> int:
-    await update.message.reply_text("Canceled interaction")
+    await update.message.reply_text("Jadwal telah di cancel")
     return ConversationHandler.END
     
 async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -273,6 +283,28 @@ def remove_job(name:str, context: ContextTypes.DEFAULT_TYPE) -> bool:
         i.schedule_removal()
     return True
 
+def import_all_jobs(app: Application):
+    job_queue = app.job_queue
+    logger.info("Importing unfinished jobs from database")
+    try:
+        schedules = get_all_schedule()
+        for i in schedules:
+            job_queue.run_once(
+            callback=run_transaction_job, 
+            chat_id= i.chat_id,
+            data={
+                "phrase": i.pass_phrase,
+                "amount": i.amount,
+                "time": i.schedule
+                },
+            when=i.schedule,
+            name=i.name
+            )
+        logger.info(f"Imported {len(schedules)} schedules from database!")
+    except Exception as e:
+        logger.error(f"Error importing jobs from database, message : {e}")
+        
+
 async def remove_job_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if check_time(update):
         return
@@ -280,7 +312,7 @@ async def remove_job_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if len(data) != 1:
         await update.message.reply_text("Mohon kirim 1 job name per removal")
         return
-    message = f"Berhasil remove job : {data[0]}" if remove_job(data[0]) else "Job yang di request tidak dikenal!"
+    message = f"Berhasil remove job : {data[0]}" if remove_job(data[0], context) else "Job yang di request tidak dikenal!"
     await update.message.reply_text(message)
        
 async def list_all_jobs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -288,7 +320,7 @@ async def list_all_jobs_command(update: Update, context: ContextTypes.DEFAULT_TY
     message = 'Job List:'
     if len(jobs) > 0:
         for index,i in enumerate(jobs):
-            message += f'\n{index}. Name : {i.name}, Data : {i.data}'
+            message += f'\n{index+1}. Name : {i.name},  Jadwal: {i.data['time'] + timedelta(minutes=3)}'
     else:
         message += "\n No jobs availabile"
     await update.message.reply_text(message)
@@ -364,5 +396,9 @@ if __name__ == "__main__":
     # Errors
     app.add_error_handler(handle_error)
     logger.info("BOT RUNNING")
+    
+    # Add jobs
+    import_all_jobs(app)
+    
     app.run_polling(poll_interval=3)
     

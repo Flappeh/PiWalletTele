@@ -3,7 +3,7 @@ from typing import Dict, Any
 from appium.options.common.base import AppiumOptions
 from appium.webdriver.common.appiumby import AppiumBy
 from appium.webdriver.webelement import WebElement
-from .environment import ANDROID_SERVER_URL, TIMEOUT_LIMIT, WALLET_DEST
+from .environment import ANDROID_SERVER_URL, TIMEOUT_LIMIT, WALLET_DEST, TRY_SEND_DURATION
 from .utils import get_logger, store_phrase, get_wallet_account, PiAccount, delete_wallet_account
 from .exceptions import PiAccountError
 from time import sleep,time
@@ -97,6 +97,8 @@ class AndroidBot():
             return "transfer"
         if "Error!" in Page_Source:
             return "transfer"
+        if "Wallet Address" in Page_Source and "Memo (optional)" in Page_Source:
+            return "transfer"
         return ""
 
     def check_current_wallet_balance(self):
@@ -132,6 +134,8 @@ class AndroidBot():
         while self.check_current_page() != "wallet_home":
             logger.info("Not in wallet home")
             self.click_notif()
+            if self.check_current_page() == "home":
+                break
             pass
         
     def open_wallet_sub_page(self):
@@ -472,7 +476,7 @@ class AndroidBot():
         current_time = time()
         logger.debug("Start sending coin")
         result = False
-        while (time() < current_time + 30) and result == False:
+        while (time() < current_time + TRY_SEND_DURATION) and result == False:
             self.start_send_coin()
     
     def open_wallet_from_passphrase(self, pwd: str):
@@ -561,8 +565,10 @@ def process_phrase_after_error(phrase:str, result_queue : Queue):
     except:
         logger.error("Error processing phrase")
 
-def process_transaction(phrase:str, amount:float):
+def process_transaction(data):
     try:
+        phrase = data[0]
+        amount = data[1]
         logger.debug("Starting a new transaction")
         bot = get_running_bot()
         bot.start_transaction(phrase,amount)
@@ -583,12 +589,14 @@ def kill_all_apps():
     bot.kill_all_apps()
     del bot
 
-def start_background_process(target: Any, phrase: str = None):
+def start_background_process(target: Any, phrase: str = None, amount: float = None):
     START_TIME = time()
     current_process = None
-    if phrase:
+    if phrase and amount == None:
         result = Queue()
         current_process = Process(target=target, args=(phrase,result))
+    elif phrase and amount:
+        current_process = Process(target=target,args=((phrase,amount),))
     else:
         current_process = Process(target=target)
     current_process.start()
@@ -602,7 +610,10 @@ def start_background_process(target: Any, phrase: str = None):
         current_process.join()
         return "timeout"
     return result.get()
-    
+
+def start_transaction_process(phrase:str, amount: float):
+    return start_background_process(process_transaction,phrase,amount)
+
 def start_bot_phrase_process(phrase:str):
     return start_background_process(process_phrase, phrase)
 

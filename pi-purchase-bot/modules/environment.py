@@ -10,6 +10,7 @@ BLOCKCHAIN_URI = os.getenv("BLOCKCHAIN_URI")
 ANDROID_SERVER_URL= os.getenv("ANDROID_SERVER_URL")
 WALLET_DEST= os.getenv("WALLET_DEST")
 TIMEOUT_LIMIT = int(os.getenv("TIMEOUT_LIMIT"))
+TRY_SEND_DURATION = int(os.getenv("TRY_SEND_DURATION"))
 
 def get_all_env():
     data = [f"{i}: {j}" for i,j in os.environ.items()]

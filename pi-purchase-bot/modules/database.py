@@ -32,9 +32,12 @@ class PiWallet(Model):
         database = db
         
 class Schedule(Model):
+    name = CharField(null = True)
+    chat_id = CharField(null = True)
     pass_phrase = CharField(null = True)
     amount = FloatField(default=0)
     schedule = DateTimeField(default=datetime.now())
+    done = BooleanField(default=False)
     class Meta:
         database = db
     
