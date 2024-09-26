@@ -53,7 +53,7 @@ def delete_wallet_account(account: PiAccount):
 
 def get_all_schedule():
     try:
-        schedules = Schedule.select().where(Schedule.done == False)
+        schedules = Schedule.select().where(Schedule.done == False, Schedule.schedule > datetime.now())
         return schedules
     except:
         logger.error("Error getting schedules list")

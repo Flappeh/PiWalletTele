@@ -611,8 +611,21 @@ def start_background_process(target: Any, phrase: str = None, amount: float = No
         return "timeout"
     return result.get()
 
+def start_background_process_void(target: Any, phrase: str = None, amount: float = None):
+    START_TIME = time()
+    current_process = Process(target=target,args=((phrase,amount),))
+    current_process.start()
+    while time() - START_TIME <= TIMEOUT:
+        if not current_process.is_alive():
+            break
+        sleep(1)
+    else:
+        current_process.terminate()
+        kill_all_apps()
+        current_process.join()
+
 def start_transaction_process(phrase:str, amount: float):
-    return start_background_process(process_transaction,phrase,amount)
+    start_background_process_void(process_transaction,phrase,amount)
 
 def start_bot_phrase_process(phrase:str):
     return start_background_process(process_phrase, phrase)
