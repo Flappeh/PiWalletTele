@@ -1,9 +1,8 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler, CallbackContext, ConversationHandler, Defaults
-from modules.environment import BOT_USERNAME,TOKEN
-from modules.blockchain import get_balance_from_public_key
-from modules.androidBot import start_bot_phrase_process, start_phrase_process_after_error, start_change_user_process, start_transaction_process
+from modules.environment import BOT_USERNAME,TOKEN, DEV_MODE
+from modules.androidBot import start_transaction_process
 from typing import List
 from datetime import datetime, timedelta
 from modules.utils import get_logger, store_schedule, finish_schedule, get_all_schedule, check_schedule
@@ -25,8 +24,9 @@ def check_time(update: Update) -> bool:
 def validate_datetime(message: str):
     try:
         data = datetime.strptime(message, "%d-%m-%Y:%H:%M:%S")
-        # if data.timestamp() < datetime.now().timestamp() + 1800:
-        #     return False, data
+        if DEV_MODE == False:
+            if data.timestamp() < datetime.now().timestamp() + 1800:
+                return False, data
         return True, data
     except:
         return False, None
@@ -43,10 +43,7 @@ async def run_transaction_job(context: ContextTypes.DEFAULT_TYPE):
     data = job.data
     await context.bot.send_message(job.chat_id, text=f"Job {job.name} mulai!")
     start_transaction_process(data['phrase'], data['amount'])
-    print("done here")
     finish_schedule(job.name)
-    print("Finished Sched")
-    await context.bot.send_message(job.chat_id, text=f"Selesai menjalankan schedule {job.name}")
     
 async def schedule_job_run(update: Update, context: CallbackContext, user_data):
     job_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
@@ -71,6 +68,8 @@ Command yang dapat dilakukan:
 
 /schedule \\-\\> Buat jadwal transaksi bot
 
+/cancel \\-\\> Cancel proses penjadwalan transaksi
+
 /list\\_jobs \\-\\> List semua jadwal transaksi mendatang
 
 /del\\_job *<nama\\-job\\>* \\-\\> Hapus jadwal transaksi yang disimpan
@@ -93,63 +92,14 @@ Command yang dapat dilakukan:
 
 /schedule \\-\\> Buat jadwal transaksi bot
 
+/cancel \\-\\> Cancel proses penjadwalan transaksi
+
 /list\\_jobs \\-\\> List semua jadwal transaksi mendatang
 
 /del\\_job *<nama\\-job\\>* \\-\\> Hapus jadwal transaksi yang disimpan
 
 """,
     parse_mode=ParseMode.MARKDOWN_V2)
-
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Parses the CallbackQuery and updates the message text."""
-    query = update.callback_query
-
-    await query.answer()
-        
-    try:
-        await query.delete_message()
-        match query.data:
-            case "check_wallet":
-                await from_wallet_command(update=update, context=context)
-            case "check_phrase":
-                await from_passphrase_command(update=update, context=context)
-            case "help":
-                await help_command(update=update, context=context)
-            case _:
-                context.bot.send_message(chat_id=update.effective_chat.id, text="Unknown Command")
-    except Exception as e:
-        logger.error(f"Error running command after button with identifier {query.data} is clicked!, detail: {e}")
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Error occurred")
-
-# async def from_wallet_helper(update: Update, context: ContextTypes.DEFAULT_TYPE, wallet_key: List[str]):
-#     if len(wallet_key) != 1:
-#             await update.message.reply_text("Mohon masukkan hanya satu wallet per transaksi")
-#             return
-#     key = wallet_key[0]
-#     try:
-#         data = get_balance_from_public_key(key)
-#         if not data:
-#             await context.bot.send_message(chat_id=update.effective_chat.id, text="None")
-#             return
-#         await context.bot.send_message(chat_id=update.effective_chat.id, text=data)
-#     except Exception as e:
-#         await context.bot.send_message(chat_id=update.effective_chat.id, text=str(e))
-     
-# async def from_wallet_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     data = ""
-#     if update.callback_query:
-        
-#         query = update.callback_query
-#         await query.answer()
-#         await context.bot.send_message(chat_id=update.effective_chat.id, text="Masukkan public key wallet yang ingin di cari")
-        
-#         print("Callback query received:", query.data)
-#         data = query.data.split()
-#     else:
-#         if check_time(update):
-#             return
-#         data = context.args    
-#     await from_wallet_helper(update,context,data)
 
 async def schedule_transaction_command(update: Update, context: CallbackContext):
     if check_time(update):
@@ -174,9 +124,10 @@ async def schedule_get_time(update:Update, context: CallbackContext) -> int:
     elif result == False and time_data:
         await update.message.reply_text("Waktu yang dikirim minimal 30 menit dari saat ini")
         return TIME
-    # if check_schedule(time_data) == False:
-    #     await update.message.reply_text("Sudah ada schedule yang berjalan pada jam yang diberikan. Jika ingin cancel, /cancel")
-    #     return TIME
+    if DEV_MODE == False:
+        if check_schedule(time_data) == False:
+            await update.message.reply_text("Sudah ada schedule yang berjalan pada jam yang diberikan. Jika ingin cancel, /cancel")
+            return TIME
     context.user_data['time'] = time_data - timedelta(minutes=3)
     await update.message.reply_text("Berapa nominal yang ingin dikirim")
     return AMOUNT
@@ -187,7 +138,10 @@ async def schedule_get_amount(update:Update, context: CallbackContext) -> int:
         await update.message.reply_text("Invalid amount, coba lagi.")
         return AMOUNT
     if amount <= 0.2:
-        await update.message.reply_text("Amount minimal yang bisa dikirim adalah 0.3")
+        await update.message.reply_text("Amount minimal yang bisa dikirim adalah 0.3 koin")
+        return AMOUNT
+    if amount > 10000:
+        await update.message.reply_text("Amount maksimal yang bisa dikirim adalah 10000 koin")
         return AMOUNT
     context.user_data['amount'] = amount
     user_data = context.user_data
@@ -210,70 +164,6 @@ async def cancel(update: Update, context: CallbackContext) -> int:
     
 async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Sorry, I didn't understand that command.")    
-
-# async def proses_phrase(proses_message, context: ContextTypes.DEFAULT_TYPE, phrase: str) -> str:
-#     try:
-#         data = start_bot_phrase_process(phrase)
-#         if "Invalid" in data:
-#             return "Phrase yang dikirim invalid!"
-#         if "timeout" in data:
-#             return "Timeout limit telah tercapai, mohon request ulang!"
-#         elif "Error butuh ganti ke user lain" in data:
-#             await context.bot.edit_message_text(text=f"Limit user tercapai, proses ganti user",chat_id=proses_message.chat_id,message_id=proses_message.id)
-#             data = start_phrase_process_after_error(phrase)
-#             return f"""
-# *Pi Wallet Bot*
-
-# *Phrase*: 
-# {phrase}
-
-# *Jumlah wallet*: 
-# {data}
-#         """
-#         else:
-#             return f"""
-# *Pi Wallet Bot*
-
-# *Phrase*: 
-# {phrase}
-
-# *Jumlah wallet*: 
-# {data}
-#         """
-#     except Exception as e:
-#         logger.error(f"Error retrieving passphrase details, {e}")
-#         return "Error occured, please contact administrator"
-# 
-# async def from_passphrase_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     if check_time(update):
-#         return
-#     phrase: List[str] = context.args
-#     if len(phrase) != 24:
-#         await update.message.reply_text("Passphrase harus 24 kata!")
-#         return
-#     phrase = ' '.join(phrase)
-#     proses_message = await update.message.reply_text("Sedang memproses request...",reply_to_message_id=update.message.id)
-#     data = await proses_phrase(proses_message,context,phrase)
-#     data = data.replace('.', '\\.').replace('!','\\!')
-#     await context.bot.edit_message_text(
-#         text=data,
-#         chat_id=proses_message.chat_id,
-#         message_id=proses_message.id,
-#         parse_mode=ParseMode.MARKDOWN_V2
-#     )
-#   
-# async def change_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     if check_time(update):
-#         return
-#     proses_message = await update.message.reply_text("Sedang memproses request...",reply_to_message_id=update.message.id) 
-#     try:
-#         data = await start_change_user_process()
-#         if data == "timeout":            
-#             return "Timeout limit telah tercapai, mohon request ulang!"
-#         await context.bot.edit_message_text(text=f"Done Processing",chat_id=proses_message.chat_id,message_id=proses_message.id)
-#     except Exception as e:
-#         await update.message.reply_text("Error occured, please contact administrator")
-#         logger.error(f"Error retrieving passphrase details, {e}")
 
 def remove_job(name:str, context: ContextTypes.DEFAULT_TYPE) -> bool:
     current_jobs = context.job_queue.get_jobs_by_name(name)
@@ -316,20 +206,19 @@ async def remove_job_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.message.reply_text(message)
        
 async def list_all_jobs_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    jobs = context.job_queue.jobs()
+    jobs = get_all_schedule()
     print(jobs)
-    message = 'Job List:'
+    message = 'Job List:\n'
     if len(jobs) > 0:
         for index,i in enumerate(jobs):
             message += f'''
 {index+1}. Job_Name : {i.name}
 
-Jadwal : {i.data['time'] + timedelta(minutes=3)}
+Jadwal : {i.schedule + timedelta(minutes=3)}
 
-Phrase : {i.data['phrase']}
+Phrase : {i.pass_phrase}
 
-Jumlah Koin : {i.data['amount']}
-
+Jumlah Koin : {i.amount}
 '''
     else:
         message += "\n No jobs availabile"
@@ -391,13 +280,8 @@ if __name__ == "__main__":
     # Command
     app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('help', help_command))
-    # app.add_handler(CommandHandler('wallet', from_wallet_command))
-    # app.add_handler(CommandHandler('phrase', from_passphrase_command))
-    # app.add_handler(CommandHandler('change', change_user_command))
     app.add_handler(CommandHandler('list_jobs', list_all_jobs_command))
     app.add_handler(CommandHandler('del_job', remove_job_command))
-    # app.add_handler(CommandHandler('print', print_page_command))
-    app.add_handler(CallbackQueryHandler(button))
     app.add_handler(conv_handler)
     
     # Messages
@@ -409,6 +293,5 @@ if __name__ == "__main__":
     
     # Add jobs
     import_all_jobs(app)
-    
     app.run_polling(poll_interval=3)
     
