@@ -58,6 +58,14 @@ def get_all_schedule():
     except:
         logger.error("Error getting schedules list")
 
+def reset_all_schedule():
+    try:
+        schedules = Schedule.select().where(Schedule.done == False, Schedule.schedule > datetime.now())
+        for i in schedules:
+            i.delete()
+    except:
+        logger.error("Error getting schedules list")
+
 def store_schedule(job_name,chat_id, user_data):
     try:
         schedule: Schedule = Schedule.create(

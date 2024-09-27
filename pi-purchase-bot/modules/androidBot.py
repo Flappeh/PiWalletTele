@@ -418,11 +418,11 @@ class AndroidBot():
         res = False
         try:
             self.driver.tap([(180,420)])
-            sleep(0.1)
+            sleep(0.06)
             self.driver.tap([(180,500)])
-            sleep(0.1)
+            sleep(0.06)
             self.driver.tap([(180,420)])
-            sleep(0.1)
+            sleep(0.06)
             # if "Memo (optional)" in self.driver.page_source:
             #     self.driver.find_element(by=AppiumBy.XPATH, value='//*[@text="Send"]').click()
             # if "Do you recognize" in self.driver.page_source:
@@ -467,17 +467,6 @@ class AndroidBot():
         except:
             logger.error("Error opening pay/request page!")
     
-    def start_transaction(self, pwd:str, amount:float):
-        self.open_wallet_from_passphrase(pwd)
-        self.open_pay_page()
-        self.enter_send_amount(amount)
-        self.enter_wallet_address()
-        self.scroll_to_bottom()
-        current_time = time()
-        logger.debug("Start sending coin")
-        result = False
-        while (time() < current_time + TRY_SEND_DURATION) and result == False:
-            self.start_send_coin()
     
     def open_wallet_from_passphrase(self, pwd: str):
         self.driver.activate_app('pi.browser/com.pinetwork.MainActivity')
@@ -517,7 +506,22 @@ class AndroidBot():
             self.change_user()
             data = self.open_wallet_from_passphrase(pwd)
         return self.open_wallet_from_passphrase(pwd)
-        
+    
+    
+    def start_transaction(self, pwd:str, amount:float):
+        open_phrase = self.open_wallet_from_passphrase(pwd)
+        if "error" in open_phrase.lower():
+            self.open_wallet_after_error(pwd)
+        self.open_pay_page()
+        self.enter_send_amount(amount)
+        self.enter_wallet_address()
+        self.scroll_to_bottom()
+        current_time = time()
+        logger.debug("Start sending coin")
+        result = False
+        while (time() < current_time + TRY_SEND_DURATION) and result == False:
+            self.start_send_coin()
+                
     def print_current_page(self):
         return self.driver.page_source
     

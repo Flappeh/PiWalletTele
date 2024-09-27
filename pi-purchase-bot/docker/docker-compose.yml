@@ -1,16 +1,18 @@
 services:
   pi-purchase-bot:
-    image: pi-wallet-bot:1.2.1
+    image: pi-purchase-bot:1.0.0
     restart: always
     network_mode: host
     container_name: pi-purchase-bot
-    environment:
-      - TOKEN=7217378842:AAGipq5KCagsO6G-fhhiiVrhfWgxgmB9JDk
-      - BOT_USERNAME=@pi_wallet_monitor_bot
-      - BLOCKCHAIN_URI=https://api.mainnet.minepi.com
-      - PYPPETEER_CHROMIUM_REVISION=1263111
-      - ANDROID_SERVER_URL=http://localhost:4723
-      - TIMEOUT_LIMIT=600
+    env_file:
+      - .env
+    # environment:
+    #   - TOKEN=7217378842:AAGipq5KCagsO6G-fhhiiVrhfWgxgmB9JDk
+    #   - BOT_USERNAME=@pi_wallet_monitor_bot
+    #   - BLOCKCHAIN_URI=https://api.mainnet.minepi.com
+    #   - PYPPETEER_CHROMIUM_REVISION=1263111
+    #   - ANDROID_SERVER_URL=http://localhost:4723
+    #   - TIMEOUT_LIMIT=600
     volumes:
       - ./data:/bot/data
   appium-server-purchase:
@@ -19,13 +21,22 @@ services:
     ports:
       - 4726:4723
     privileged: true
+    # network_mode: host
     restart: always
+    dns:
+      - 192.168.18.1
+      - 192.168.18.18
     volumes:
       - /home/flappeh/.android:/home/androidusr/.android
+    extra_hosts:
+      - "host.docker.internal:172.17.0.1"
     environment:
       - REMOTE_ADB=true
-      - ANDROID_DEVICES=192.168.18.221:15556
+      # - ANDROID_DEVICES=localhost:5557
+      - ANDROID_DEVICES=host.docker.internal:15556
+      # - DISPLAY=:1
       - REMOTE_ADB_POLLING_SEC=30
+      # - APPIUM_PORT=4726
       - APPIUM_ADDITIONAL_PARAMS=--relaxed-security --allow-insecure chromedriver_autodownload --allow-insecure adb_shell(venv)
 # networks:
 #   appium:

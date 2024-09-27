@@ -5,7 +5,7 @@ from modules.environment import BOT_USERNAME,TOKEN, DEV_MODE
 from modules.androidBot import start_transaction_process
 from typing import List
 from datetime import datetime, timedelta
-from modules.utils import get_logger, store_schedule, finish_schedule, get_all_schedule, check_schedule
+from modules.utils import get_logger, store_schedule, finish_schedule, get_all_schedule, check_schedule,reset_all_schedule
 import random
 import string
 import pytz
@@ -173,6 +173,10 @@ def remove_job(name:str, context: ContextTypes.DEFAULT_TYPE) -> bool:
         i.schedule_removal()
     return True
 
+async def remove_all_schedules_command(update:Update, context: ContextTypes.DEFAULT_TYPE):
+    reset_all_schedule()
+    await update.message.reply_text("Finished removing all schedules")
+
 def import_all_jobs(app: Application):
     job_queue = app.job_queue
     logger.info("Importing unfinished jobs from database")
@@ -282,6 +286,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler('help', help_command))
     app.add_handler(CommandHandler('list_jobs', list_all_jobs_command))
     app.add_handler(CommandHandler('del_job', remove_job_command))
+    app.add_handler(CommandHandler('reset_schedule', remove_all_schedules_command))
     app.add_handler(conv_handler)
     
     # Messages
