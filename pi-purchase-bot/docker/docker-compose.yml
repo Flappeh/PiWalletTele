@@ -1,6 +1,6 @@
 services:
   pi-purchase-bot:
-    image: pi-purchase-bot:1.0.0
+    image: pi-purchase-bot:1.1.1
     restart: always
     network_mode: host
     container_name: pi-purchase-bot
