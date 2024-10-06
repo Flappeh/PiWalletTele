@@ -2,3 +2,4 @@ venv
 .env
 *_pycache_*
 example-source
+*database.db*

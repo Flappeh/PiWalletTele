@@ -7,7 +7,8 @@ from modules.androidBot import start_bot_phrase_process, start_phrase_process_af
 from typing import List
 import datetime
 from modules.utils import get_logger
-
+from telegram.error import NetworkError
+import sys
 logger = get_logger(__name__)
 # Commands
 
@@ -220,10 +221,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print('Bot ', response )
     await update.message.reply_text(response)
     
-
+# async def stop()
 async def handle_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"Update {update} caused error : {context.error}")
-    
+    context.application.updater.stop()
+    context.application.stop()
+    context.application.shutdown()
+    sys.exit()
 
 if __name__ == "__main__":
     app = Application.builder().token(TOKEN).build()

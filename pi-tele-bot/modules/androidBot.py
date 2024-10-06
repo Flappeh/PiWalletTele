@@ -60,6 +60,20 @@ class AndroidBot():
             return True
         return False
 
+    def click_back_button(self):
+        try:
+            logger.debug("Clicking back button")
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[@resource-id="address-bar-back-button"]').click()
+        except:
+            logger.error("Error clicking back button")
+    
+    def click_remind_button(self):
+        try:
+            logger.debug("Clicking remind later")
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Remind Me Later")]').click()
+        except:
+            logger.error("Error clicking remind later")
+    
     def check_current_page(self):
         Page_Source = self.driver.page_source
         if "Welcome to the Pi Browser" in Page_Source:
@@ -117,6 +131,8 @@ class AndroidBot():
         while self.check_current_page() != "wallet_home":
             logger.info("Not in wallet home")
             self.click_notif()
+            if self.check_current_page() == "home":
+                break
             pass
         
     def open_wallet_sub_page(self):
@@ -396,6 +412,8 @@ class AndroidBot():
     def open_wallet_from_passphrase(self, pwd: str):
         self.driver.activate_app('pi.browser/com.pinetwork.MainActivity')
         logger.info(f"Received new request for phrase: {pwd}")
+        if self.check_current_page() == "wallet_home":
+            self.click_back_button()
         if self.check_current_page() != "wallet_home":
             self.navigate_to_wallet_home()
         result = self.enter_wallet_phrase(pwd)
