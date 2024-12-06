@@ -70,10 +70,15 @@ class AndroidBot():
     def click_remind_button(self):
         try:
             logger.debug("Clicking remind later")
-            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Remind Me Later")]').click()
+            self.driver.tap([(260,60)])
         except:
             logger.error("Error clicking remind later")
-    
+    def click_try_mining(self):
+        try:
+            logger.debug("Found start mining popup")
+            self.driver.tap()
+        except:
+            logger.error("Unable to click try mining")
     def check_current_page(self):
         Page_Source = self.driver.page_source
         if "Welcome to the Pi Browser" in Page_Source:
@@ -93,6 +98,9 @@ class AndroidBot():
             return "verification"
         if "Available Balance" in Page_Source:
             return "wallet_page"
+        if "Start Mining Pi Effort" in Page_Source:
+            return "try_mining"
+        
         if "Translation loading ..." in Page_Source:
             self.click_update()
             return "update"
@@ -108,6 +116,8 @@ class AndroidBot():
                 self.click_update()
             if current_page == "verification":
                 self.verify_wallet()
+            if current_page == "try_mining":
+                self.click_try_mining()
             current_page = self.check_current_page()
         try:
             logger.debug("Trying to get available balance")
@@ -184,10 +194,11 @@ class AndroidBot():
     
     def enter_wallet_phrase(self, pwd:str)-> str:
         logger.debug("Received enter wallet phrase command")
-        page = self.driver.page_source
+        page = ""
         error_check = 0
-        while self.try_enter_wallet(pwd) != True:
-            self.try_enter_wallet(pwd)
+        result = False
+        while result == False and error_check < 6:
+            result = self.try_enter_wallet(pwd)
             page = self.driver.page_source
             if "Available Balance" in page:
                 break
@@ -199,6 +210,16 @@ class AndroidBot():
                 error_check += 1
             if "This is your identity on the Pi Blockchain" in self.driver.page_source:
                 self.verify_wallet()
+            if "Welcome to the Pi Browser" in self.driver.page_source:
+                self.open_wallet_sub_page()
+            if "Continue with phone number" in self.driver.page_source:
+                break
+            if "Register with phone number" in self.driver.page_source:
+                break
+            if "Enter your password" in self.driver.page_source:
+                break
+            error_check += 1
+        page = self.driver.page_source
         if "An error" in page:
             return "error"
         elif "Invalid" in page:
@@ -212,6 +233,12 @@ class AndroidBot():
         logger.debug("Received sign out user command")
         result = False
         while result == False:
+            if "Continue with phone number" in self.driver.page_source:
+                break
+            if "Register with phone number" in self.driver.page_source:
+                break
+            if "Enter your password" in self.driver.page_source:
+                break
             try:
                 self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Sign Out")]').click()
                 sleep(0.4)
@@ -245,9 +272,13 @@ class AndroidBot():
     def insert_phone_number(self, account: PiAccount)-> bool:
         try:
             logger.debug("Inserting phone number")
-            while "Register with phone number" not in self.driver.page_source:
+            if "Continue with phone number" in self.driver.page_source:
                 self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "with phone number")]').click()
-                sleep(0.2)
+                sleep(1)
+            # while "Register with phone number" not in self.driver.page_source:
+            #     print("Clicking register with phone number")
+            #     self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "with phone number")]').click()
+            #     sleep(0.2)
             country_box = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "United States")]')
             country_box.click()
             sleep(0.2)
@@ -256,6 +287,7 @@ class AndroidBot():
             self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.TextView[contains(@text, "Phone number")]').click()
             phone_box = self.driver.find_element(by=AppiumBy.XPATH, value='//android.view.View[@resource-id="root"]/android.view.View/android.view.View/android.view.View/android.view.View[3]/android.widget.EditText')
             phone_box.send_keys(account.phone)
+            logger.debug("Clicking submit button")
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Submit")]').click()
             sleep(0.5)
             return True
@@ -263,7 +295,7 @@ class AndroidBot():
             logger.error("Error inserting phone number")
             return False
     
-    def enter_phone_number(self, account: PiAccount) -> bool:
+    def enter_phone_password(self, account: PiAccount) -> bool:
         try:
             while "Enter your password" in self.driver.page_source:
                 logger.debug("Trying to insert phone number")
@@ -285,11 +317,16 @@ class AndroidBot():
             return False
         try:
             logger.debug("Logging in with new phone number")
-            self.insert_phone_number(account)
-            self.enter_phone_number(account)
+            while "Register with phone number" not in self.driver.page_source:
+                self.insert_phone_number(account)
+                if "Enter your password" in self.driver.page_source:
+                    break
+            
+            self.enter_phone_password(account)
             while "Enter your password" in self.driver.page_source:
                 logger.warning("Still in password form")
-                self.driver.hide_keyboard()
+                self.enter_phone_password(account)
+                # self.driver.hide_keyboard()
                 if "Invalid phone number" in self.driver.page_source:
                     self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Return to login")]').click()
                     delete_wallet_account(account)
@@ -313,6 +350,12 @@ class AndroidBot():
                     break
                 if "Mining Session Ends" in self.driver.page_source:
                     self.driver.tap([(40,50)])
+                    break
+                if "Continue with phone number" in self.driver.page_source:
+                    break
+                if "Register with phone number" in self.driver.page_source:
+                    break
+                if "Enter your password" in self.driver.page_source:
                     break
                 sleep(0.2)
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Not Now")]').click()
@@ -375,6 +418,8 @@ class AndroidBot():
             logger.debug("Handling user verification")
             if "Sign out" in self.driver.page_source:
                 return True
+            elif "Continue with phone" in self.driver.page_source or "Please verify your identity" in self.driver.page_source:
+                return True
             self.driver.tap([(20,50)])
             sleep(1)
             if "Chat" in self.driver.page_source and "Roles" in self.driver.page_source and "Referral" in self.driver.page_source:
@@ -418,10 +463,14 @@ class AndroidBot():
             self.navigate_to_wallet_home()
         result = self.enter_wallet_phrase(pwd)
         if result == "exception":
-            while result == "exception":
+            i = 0
+            while i < 3:
                 result = self.enter_wallet_phrase(pwd)
+                i += 1
                 if result == "error":
                     break
+                if i == 2:
+                    raise
         if result == "error":
             return "Error butuh ganti ke user lain"
         if result == "invalid":
@@ -462,7 +511,7 @@ class AndroidBot():
        
     def __del__(self):
         logger.info("Finished running script")
-        self.driver.quit()
+        # self.driver.stop_client()
 
 def get_running_bot():
     if len(running_bot) != 0:
@@ -487,6 +536,8 @@ def process_phrase(phrase:str, result_queue : Queue):
         result_queue.put(data)
     except:
         logger.error("Error processing phrase")
+        result_queue.put("Invalid")
+        
 
 def process_phrase_after_error(phrase:str, result_queue : Queue):
     try:
