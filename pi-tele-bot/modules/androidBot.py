@@ -8,6 +8,7 @@ from .utils import get_logger, store_phrase, get_wallet_account, PiAccount, dele
 from .exceptions import PiAccountError
 from time import sleep,time
 from multiprocessing import Process, Queue
+import os
 
 TIMEOUT = TIMEOUT_LIMIT
 logger = get_logger(__name__)
@@ -44,14 +45,15 @@ class AndroidBot():
             notif.click()
         except:
             pass
-
-    def verify_wallet(self) -> None:
+    def verify_wallet(self) -> bool:
         try:
             logger.debug("Verifying wallet ownership")
             self.driver.find_element(by=AppiumBy.XPATH, value="//android.widget.Button[contains(@text,'Continue')]").click()
+            sleep(1)
+            return True
         except:
             logger.warning("Unable to verify")
-
+            return False
     def check_is_loading(self):
         loading_screen = self.driver.find_element(by=AppiumBy.XPATH, value='//*[@text="Loading..."]')
         if loading_screen:
@@ -192,24 +194,28 @@ class AndroidBot():
             logger.error("Error entering wallet phrase")
             return False
     
+    def capture_screen(self):
+        try:
+            logger.info("Taking picture")
+            tmp_dir = os.getcwd() + '/data/'
+            print("Saving in ", tmp_dir)
+            data = self.driver.save_screenshot(tmp_dir + 'tmp.png')
+            print(f"Result : {data}")
+        except:
+            logger.error("Unable to capture screen")
+    
     def enter_wallet_phrase(self, pwd:str)-> str:
         logger.debug("Received enter wallet phrase command")
         page = ""
-        error_check = 0
-        result = False
-        while result == False and error_check < 6:
-            result = self.try_enter_wallet(pwd)
+        tries = 0
+        for _ in range(6):
+            self.try_enter_wallet(pwd)
             page = self.driver.page_source
             if "Available Balance" in page:
                 break
-            if error_check == 5:
-                return "error"
-            if "An error" in page:
-                error_check += 1
-            if "Invalid" in page:
-                error_check += 1
             if "This is your identity on the Pi Blockchain" in self.driver.page_source:
-                self.verify_wallet()
+                if self.verify_wallet():
+                    break
             if "Welcome to the Pi Browser" in self.driver.page_source:
                 self.open_wallet_sub_page()
             if "Continue with phone number" in self.driver.page_source:
@@ -218,7 +224,10 @@ class AndroidBot():
                 break
             if "Enter your password" in self.driver.page_source:
                 break
-            error_check += 1
+            tries +=1
+        
+        # if tries == 6:
+        #     self.capture_screen()
         page = self.driver.page_source
         if "An error" in page:
             return "error"
@@ -374,9 +383,12 @@ class AndroidBot():
             sleep(0.3)
             self.driver.tap([(110,200)])
             sleep(0.3)
-            self.driver.flick(100,300,100,200)
+            self.driver.flick(100,300,100,100)
             sleep(1)
-            self.driver.tap([(150,620)])
+            try:
+                self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Alternative")]').click()
+            except:
+                pass
             current_tries = 0
             result = False
             while current_tries < 5:
@@ -459,18 +471,12 @@ class AndroidBot():
         logger.info(f"Received new request for phrase: {pwd}")
         if self.check_current_page() == "wallet_home":
             self.click_back_button()
-        if self.check_current_page() != "wallet_home":
+        elif self.check_current_page() != "wallet_home":
             self.navigate_to_wallet_home()
         result = self.enter_wallet_phrase(pwd)
         if result == "exception":
-            i = 0
-            while i < 3:
+            for i in range(3):
                 result = self.enter_wallet_phrase(pwd)
-                i += 1
-                if result == "error":
-                    break
-                if i == 2:
-                    raise
         if result == "error":
             return "Error butuh ganti ke user lain"
         if result == "invalid":
@@ -527,6 +533,14 @@ def get_running_bot():
     running_bot.append(bot)
     logger.info(f"Running bot count : {len(running_bot)}")
     return bot
+
+def process_screenshot():
+    try:
+        logger.debug("Starting new request to take screenshot")
+        bot = get_running_bot()
+        bot.capture_screen()
+    except:
+        logger.error("Error taking screenshot")
 
 def process_phrase(phrase:str, result_queue : Queue):
     try:
