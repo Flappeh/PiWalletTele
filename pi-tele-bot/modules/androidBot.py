@@ -8,6 +8,7 @@ from .utils import get_logger, store_phrase, get_wallet_account, PiAccount, dele
 from .exceptions import PiAccountError
 from time import sleep,time
 from multiprocessing import Process, Queue
+from .imagetools import match_template
 import os
 
 TIMEOUT = TIMEOUT_LIMIT
@@ -194,15 +195,15 @@ class AndroidBot():
             logger.error("Error entering wallet phrase")
             return False
     
-    def capture_screen(self):
+    def check_if_invalid(self):
         try:
             logger.info("Taking picture")
             tmp_dir = os.getcwd() + '/data/'
-            print("Saving in ", tmp_dir)
-            data = self.driver.save_screenshot(tmp_dir + 'tmp.png')
-            print(f"Result : {data}")
-        except:
-            logger.error("Unable to capture screen")
+            self.driver.save_screenshot(tmp_dir + 'tmp.png')
+            result = match_template()
+            print(f"Result is {'Found' if result else 'Not Found'}")
+        except Exception as e:
+            logger.error("Unable to capture screen, error ", e)
     
     def enter_wallet_phrase(self, pwd:str)-> str:
         logger.debug("Received enter wallet phrase command")
@@ -520,17 +521,17 @@ class AndroidBot():
         # self.driver.stop_client()
 
 def get_running_bot():
-    if len(running_bot) != 0:
-        logger.debug("Found running bot")
-        bot: AndroidBot = running_bot[0]
-        if time() - bot.age > 4800:
-            logger.debug("Bot exceeds maximum time, creating a new one")
-            del bot
-        else:
-            return bot
+    # if len(running_bot) != 0:
+    #     logger.debug("Found running bot")
+    #     bot: AndroidBot = running_bot[0]
+    #     if time() - bot.age > 4800:
+    #         logger.debug("Bot exceeds maximum time, creating a new one")
+    #         del bot
+    #     else:
+    #         return bot
     logger.debug("Creating a new bot.")
     bot = AndroidBot()
-    running_bot.append(bot)
+    # running_bot.append(bot)
     logger.info(f"Running bot count : {len(running_bot)}")
     return bot
 
@@ -538,7 +539,7 @@ def process_screenshot():
     try:
         logger.debug("Starting new request to take screenshot")
         bot = get_running_bot()
-        bot.capture_screen()
+        bot.check_if_invalid()
     except:
         logger.error("Error taking screenshot")
 

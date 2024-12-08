@@ -5,11 +5,11 @@ import os
 method = cv2.TM_CCOEFF_NORMED
 
 
-def check_if_invalid() -> bool:
-   to_check = "data/test.png"
+def match_template() -> bool:
+   to_check = "./data/tmp.png"
    
    img = cv2.imread(to_check,1)
-   template = cv2.imread('data/invalid.png',0)
+   template = cv2.imread('./data/invalid.png',0)
    
    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
