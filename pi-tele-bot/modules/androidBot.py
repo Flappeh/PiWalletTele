@@ -470,10 +470,12 @@ class AndroidBot():
     def open_wallet_from_passphrase(self, pwd: str):
         self.driver.activate_app('pi.browser/com.pinetwork.MainActivity')
         logger.info(f"Received new request for phrase: {pwd}")
-        if self.check_current_page() == "wallet_home":
+        current_page = self.check_current_page()
+        if current_page == "wallet_home":
             self.click_back_button()
-        elif self.check_current_page() != "wallet_home":
+        else:
             self.navigate_to_wallet_home()
+        
         result = self.enter_wallet_phrase(pwd)
         if result == "exception":
             for i in range(3):
