@@ -36,6 +36,28 @@ def find_contrast():
    cv2.imshow("result", thresh)
    cv2.waitKey(0)
 
+def check_dismiss_login():
+   to_check = "./data/tmp.png"
+   
+   img = cv2.imread(to_check,1)
+   template = cv2.imread('./data/dismiss-login.png',0)
+   
+   gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+
+   matched = cv2.matchTemplate(gray,template,cv2.TM_CCOEFF_NORMED)
+   threshold = 0.9
+
+   loc = np.where( matched >= threshold)
+   data = list(zip(*loc[::-1]))
+   print(data)
+   # os.remove(to_check)
+   if len(data) > 0:
+      return True
+   return False
+
+check_dismiss_login()
+
 def match_template() -> bool:
    to_check = "./data/tmp.png"
    
@@ -88,4 +110,4 @@ def match_template() -> bool:
    # The image is only displayed if we call this
    # cv2.waitKey(0)
    
-find_contrast()
+# find_contrast()

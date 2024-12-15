@@ -29,6 +29,8 @@ class AndroidBot():
         self.driver: webdriver.Remote = webdriver.Remote(ANDROID_SERVER_URL, options=AppiumOptions().load_capabilities(capabilities))
         self.current_page = ""
         self.age = time()
+        self.width = self.driver.get_window_size()["width"]
+        self.height = self.driver.get_window_size()["height"]
         
     def click_update(self) -> None:
         try:
@@ -82,31 +84,37 @@ class AndroidBot():
             self.driver.tap()
         except:
             logger.error("Unable to click try mining")
+            
     def check_current_page(self):
         Page_Source = self.driver.page_source
         if "Welcome to the Pi Browser" in Page_Source:
+            self.current_page = "home"
             return "home"
         if "Loading" in Page_Source:
+            self.current_page = "loading"
             return "loading"
         if "Unlock Pi Wallet" in Page_Source:
+            self.current_page = "wallet_home"
             return "wallet_home"
         if "Turn on notifications!" in Page_Source:
             self.click_notif()
+            self.current_page = "notification"
             return "notification"
-        if "Update your app" in Page_Source:
-            self.click_update()
-            return "update"
         if "This is your identity on the Pi" in Page_Source:
             self.verify_wallet()
+            self.current_page = "verification"
             return "verification"
         if "Available Balance" in Page_Source:
+            self.current_page = "wallet_page"
             return "wallet_page"
         if "Start Mining Pi Effort" in Page_Source:
+            self.current_page = "try_mining"
             return "try_mining"
-        
-        if "Translation loading ..." in Page_Source:
+        if "Update your app" in Page_Source or "Translation loading ..." in Page_Source:
             self.click_update()
+            self.current_page = "update"
             return "update"
+        
         return ""
 
     def check_current_wallet_balance(self):
@@ -147,14 +155,16 @@ class AndroidBot():
             if self.check_current_page() == "home":
                 break
             pass
-        
+    
+    # From home page open "Wallet" Page
     def open_wallet_sub_page(self):
-        try:
-            logger.debug("Opening wallet sub page")
-            self.driver.tap([(160,330)])
-        except:
-            logger.error("Error going to sub page")
         while self.check_current_page() != "wallet_home":
+            if self.check_current_page() == "home":
+                try:
+                    logger.debug("Opening wallet sub page")
+                    self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value='new UiSelector().text("Wallet logo")').click()
+                except:
+                    logger.error("Error going to sub page")
             self.click_notif()
             pass
             
@@ -209,9 +219,13 @@ class AndroidBot():
         logger.debug("Received enter wallet phrase command")
         page = ""
         tries = 0
-        for _ in range(6):
+        while tries < 6:
             self.try_enter_wallet(pwd)
             page = self.driver.page_source
+            if "Loading" in page:
+                pass
+            if "An error occurred" in page:
+                return "error"
             if "Available Balance" in page:
                 break
             if "This is your identity on the Pi Blockchain" in self.driver.page_source:
@@ -348,11 +362,12 @@ class AndroidBot():
     def navigate_to_pi_network(self) -> None:
         try:
             logger.debug("Navigation to pi network, clicking keep on mining")
+            width = self.width * 0.97
+            min_height = self.height * 0.35
+            max_height = self.height * 0.59
             while "Keep on mining" not in self.driver.page_source:
-                self.driver.tap([(260,300)])
-                self.driver.tap([(260,310)])
-                self.driver.tap([(260,340)])
-                self.driver.tap([(260,360)])
+                for i in range(min_height,max_height,30):
+                    self.driver.tap([width, i])
                 if "Mine by confirming" in self.driver.page_source:
                     self.driver.tap([(150,570)])
                     sleep(0.3)
