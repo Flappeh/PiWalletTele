@@ -4,6 +4,7 @@ from appium.options.common.base import AppiumOptions
 from appium.webdriver.common.appiumby import AppiumBy
 from appium.webdriver.webelement import WebElement
 from .environment import ANDROID_SERVER_URL, TIMEOUT_LIMIT
+from math import floor
 from .utils import get_logger, store_phrase, get_wallet_account, PiAccount, delete_wallet_account
 from .exceptions import PiAccountError
 from time import sleep,time
@@ -21,12 +22,14 @@ capabilities: Dict[str, Any] = {
     # "appPackage":"pi.browser", 
     # "appActivity": "com.pinetwork.MainActivity",
     "deviceName": "Android",
-    "language": "en"
+    "language": "en",
+    "disableWindowAnimation": "true"
 }
 
 class AndroidBot():
     def __init__(self) -> None:
         self.driver: webdriver.Remote = webdriver.Remote(ANDROID_SERVER_URL, options=AppiumOptions().load_capabilities(capabilities))
+        self.driver.update_settings({"waitForIdleTimeout": 0})
         self.current_page = ""
         self.age = time()
         self.width = self.driver.get_window_size()["width"]
@@ -45,6 +48,13 @@ class AndroidBot():
         try:
             logger.debug("Clicking notification")
             notif = self.driver.find_element(by=AppiumBy.XPATH, value='//*[@text="Not Now"]')
+            notif.click()
+        except:
+            pass
+    def click_phone_notif(self) -> None:
+        try:
+            logger.debug("Clicking phone notification")
+            notif = self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.Button[@resource-id="com.android.permissioncontroller:id/permission_deny_button"]')
             notif.click()
         except:
             pass
@@ -69,6 +79,13 @@ class AndroidBot():
         try:
             logger.debug("Clicking back button")
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[@resource-id="address-bar-back-button"]').click()
+        except:
+            logger.error("Error clicking back button")
+
+    def click_back_button_login(self):
+        try:
+            logger.debug("Clicking back button")
+            self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.Button[@text="Open drawer"]').click()
         except:
             logger.error("Error clicking back button")
     
@@ -110,6 +127,10 @@ class AndroidBot():
         if "Start Mining Pi Effort" in Page_Source:
             self.current_page = "try_mining"
             return "try_mining"
+        if "Allow Pi Browser to send" in Page_Source:
+            self.click_phone_notif()
+            self.current_page = "phone_notif"
+            return "phone_notif"
         if "Update your app" in Page_Source or "Translation loading ..." in Page_Source:
             self.click_update()
             self.current_page = "update"
@@ -189,6 +210,7 @@ class AndroidBot():
                     self.verify_wallet()
                 case _:
                     logger.warning("Got undefined while navigating to wallet home")
+                    sleep(1)
             current_page = self.check_current_page()
             logger.debug(f"Current page after match: {current_page}")  # Debugging line
     
@@ -274,9 +296,10 @@ class AndroidBot():
         
     def open_profile_page(self) -> None:
         logger.debug("Opening profile page")
+        menu_burger = (floor(self.width*0.09), floor(self.height*0.065))
         if "Referral Team" not in self.driver.page_source and "Node" not in self.driver.page_source:
             sleep(0.3)
-            self.driver.tap([(30,50)])
+            self.driver.tap([(menu_burger)])
         sleep(0.35)
         self.driver.flick(100,500,100,200)
         sleep(0.3)
@@ -306,6 +329,7 @@ class AndroidBot():
             country_box = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "United States")]')
             country_box.click()
             sleep(0.2)
+            # country_box.send_keys("indonesia")
             self.enter_keyboard_indonesia()
             self.driver.hide_keyboard()
             self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.TextView[contains(@text, "Phone number")]').click()
@@ -359,34 +383,52 @@ class AndroidBot():
         except Exception as e:
             logger.error(f"Error occured while logging in with phone number, {e}")
     
+    def dismiss_contributor(self):
+        try:
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Dismiss")]').click()
+        except:
+            logger.error("Error clicking dismiss contributor")
+    
     def navigate_to_pi_network(self) -> None:
         try:
             logger.debug("Navigation to pi network, clicking keep on mining")
-            width = self.width * 0.97
-            min_height = self.height * 0.35
-            max_height = self.height * 0.59
+            width = floor(self.width * 0.97)
+            min_height = floor(self.height * 0.35)
+            max_height = floor(self.height * 0.59)
+            logger.info(f"Height : {max_height}, width : {width}")
             while "Keep on mining" not in self.driver.page_source:
+                print(1)
+                if "Mining Session Ends" in self.driver.page_source:
+                    self.click_back_button_login()
+                    break
+                print(5)
+                if "Continue with phone number" in self.driver.page_source:
+                    break
+                print(6)
+                if "Register with phone number" in self.driver.page_source:
+                    break
+                print(7)
+                if "Enter your password" in self.driver.page_source:
+                    break
+                print(4)
+                if "You just unlocked" in self.driver.page_source:
+                    self.dismiss_contributor()
+                print(2)
                 for i in range(min_height,max_height,30):
-                    self.driver.tap([width, i])
+                    self.driver.tap([(width, i)])
+                    sleep(0.2)
+                print(3)
                 if "Mine by confirming" in self.driver.page_source:
                     self.driver.tap([(150,570)])
                     sleep(0.3)
                     self.driver.tap([12,74])
                     break
-                if "Mining Session Ends" in self.driver.page_source:
-                    self.driver.tap([(40,50)])
-                    break
-                if "Continue with phone number" in self.driver.page_source:
-                    break
-                if "Register with phone number" in self.driver.page_source:
-                    break
-                if "Enter your password" in self.driver.page_source:
-                    break
                 sleep(0.2)
+            logger.info("Done")
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Not Now")]').click()
             self.driver.tap([(50,350)])
-        except:
-            logger.error("Error navigating to pi network")
+        except Exception as e:
+            logger.error(f"Error navigating to pi network, error : {e}")
     
     def login_to_browser(self) -> bool:
         try:
@@ -395,11 +437,11 @@ class AndroidBot():
                 sleep(0.3)
                 self.driver.tap([(30,50)])
             sleep(0.35)
-            self.driver.flick(100,200,100,300)
+            self.driver.flick(100,100,100,400)
             sleep(0.3)
             self.driver.tap([(110,200)])
             sleep(0.3)
-            self.driver.flick(100,300,100,100)
+            self.driver.flick(100,400,100,100)
             sleep(1)
             try:
                 self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Alternative")]').click()
