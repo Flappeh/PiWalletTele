@@ -218,7 +218,9 @@ class AndroidBot():
         try:
             logger.debug("Trying to enter wallet phrase")
             login_box = self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.EditText')
+            sleep(0.4)
             login_box.clear()
+            sleep(0.4)
             login_box.send_keys(pwd)
             self.driver.hide_keyboard()
             self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.Button[contains(@text, "Unlock With")]').click()
@@ -293,20 +295,27 @@ class AndroidBot():
             except:
                 logger.error("Unable to sign out")
             sleep(0.3)
-        
-    def open_profile_page(self) -> None:
-        logger.debug("Opening profile page")
-        menu_burger = (floor(self.width*0.09), floor(self.height*0.065))
-        if "Referral Team" not in self.driver.page_source and "Node" not in self.driver.page_source:
+    
+    def tap_menu_burger(self) -> None:
+        try:
+            menu_burger = (floor(self.width*0.09), floor(self.height*0.065))
             sleep(0.3)
             self.driver.tap([(menu_burger)])
-        sleep(0.35)
-        self.driver.flick(100,500,100,200)
-        sleep(0.3)
+        except:
+            logger.error("Error tapping menu burger")
+            
+    def open_profile_page(self) -> None:
+        logger.debug("Opening profile page")
+        if "Referral Team" not in self.driver.page_source and "Node" not in self.driver.page_source:
+            self.tap_menu_burger()
+        sleep(1)
+        self.driver.flick(100,self.height*0.5,100,self.height*0.2)
+        sleep(1)
         try:
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Profile")]').click()
         except:
             logger.error("Error clicking profile button")
+        sleep(1)
         self.sign_out_user()
         
     def enter_keyboard_indonesia(self):
@@ -347,8 +356,10 @@ class AndroidBot():
         try:
             while "Enter your password" in self.driver.page_source:
                 logger.debug("Trying to insert phone number")
+                sleep(1)
                 password_box = self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.EditText')
                 password_box.send_keys(account.password)
+                sleep(1)
                 self.driver.hide_keyboard()
                 self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Submit")]').click()
                 sleep(0.5)
@@ -375,10 +386,13 @@ class AndroidBot():
                 logger.warning("Still in password form")
                 self.enter_phone_password(account)
                 # self.driver.hide_keyboard()
-                if "Invalid phone number" in self.driver.page_source:
-                    self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Return to login")]').click()
-                    delete_wallet_account(account)
-                    return False
+                try:
+                    if "Invalid phone number" in self.driver.page_source:
+                        self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Return to login")]').click()
+                        delete_wallet_account(account)
+                        return False
+                except:
+                    pass
             return True
         except Exception as e:
             logger.error(f"Error occured while logging in with phone number, {e}")
@@ -395,56 +409,47 @@ class AndroidBot():
             width = floor(self.width * 0.97)
             min_height = floor(self.height * 0.35)
             max_height = floor(self.height * 0.59)
-            logger.info(f"Height : {max_height}, width : {width}")
             while "Keep on mining" not in self.driver.page_source:
-                print(1)
                 if "Mining Session Ends" in self.driver.page_source:
                     self.click_back_button_login()
                     break
-                print(5)
                 if "Continue with phone number" in self.driver.page_source:
                     break
-                print(6)
                 if "Register with phone number" in self.driver.page_source:
                     break
-                print(7)
                 if "Enter your password" in self.driver.page_source:
                     break
-                print(4)
                 if "You just unlocked" in self.driver.page_source:
                     self.dismiss_contributor()
-                print(2)
-                for i in range(min_height,max_height,30):
+                for i in range(min_height,max_height,100):
                     self.driver.tap([(width, i)])
                     sleep(0.2)
-                print(3)
                 if "Mine by confirming" in self.driver.page_source:
                     self.driver.tap([(150,570)])
                     sleep(0.3)
                     self.driver.tap([12,74])
                     break
-                sleep(0.2)
-            logger.info("Done")
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Not Now")]').click()
             self.driver.tap([(50,350)])
-        except Exception as e:
-            logger.error(f"Error navigating to pi network, error : {e}")
+        except:
+            logger.error(f"Error navigating to pi network")
     
+    # HERE
     def login_to_browser(self) -> bool:
         try:
             logger.debug("Logging in to pi browser after signing in")
             if "Referral Team" not in self.driver.page_source and "Node" not in self.driver.page_source:
                 sleep(0.3)
-                self.driver.tap([(30,50)])
+                self.tap_menu_burger()
             sleep(0.35)
-            self.driver.flick(100,100,100,400)
-            sleep(0.3)
-            self.driver.tap([(110,200)])
-            sleep(0.3)
-            self.driver.flick(100,400,100,100)
+            self.driver.flick(100,self.height*0.2,100,self.height*0.5)
+            sleep(0.5)
+            self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.Button[@text="Pi Browser"]').click()
+            # sleep(0.5)
+            # self.driver.flick(100,400,100,100)
             sleep(1)
             try:
-                self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Alternative")]').click()
+                self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Alternative Sign")]').click()
             except:
                 pass
             current_tries = 0
@@ -459,7 +464,10 @@ class AndroidBot():
                     result = True
                     break
                 if "If above button doesn't" in self.driver.page_source:
-                    self.driver.tap([(150,620)])
+                    try:
+                        self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Alternative Sign")]').click()
+                    except:
+                        pass
                 else:
                     sleep(1)
                     current_tries += 1
@@ -486,16 +494,14 @@ class AndroidBot():
     def check_if_user_verif_needed(self) -> bool:
         try:
             logger.debug("Handling user verification")
-            if "Sign out" in self.driver.page_source:
+            if "Sign out" in self.driver.page_source or  "Sign Out" in self.driver.page_source:
                 return True
             elif "Continue with phone" in self.driver.page_source or "Please verify your identity" in self.driver.page_source:
                 return True
-            self.driver.tap([(20,50)])
-            sleep(1)
+            self.tap_menu_burger()
             if "Chat" in self.driver.page_source and "Roles" in self.driver.page_source and "Referral" in self.driver.page_source:
                 return True
-            self.driver.tap([(20,50)])
-            sleep(1)
+            self.tap_menu_burger()
             if "Chat" in self.driver.page_source and "Roles" in self.driver.page_source and "Referral" in self.driver.page_source:
                 return True
             elif "Continue with phone" in self.driver.page_source or "Please verify your identity" in self.driver.page_source:
@@ -535,15 +541,11 @@ class AndroidBot():
         
         result = self.enter_wallet_phrase(pwd)
         if result == "exception":
-            for i in range(3):
-                result = self.enter_wallet_phrase(pwd)
+            result = self.enter_wallet_phrase(pwd)
         if result == "error":
             return "Error butuh ganti ke user lain"
         if result == "invalid":
-            i = 0
-            while i < 3:
-                result = self.enter_wallet_phrase(pwd)
-                i += 1
+            result = self.enter_wallet_phrase(pwd)
             if result == "ok":
                 self.check_current_page()
             elif result == "error":
@@ -553,6 +555,8 @@ class AndroidBot():
         else:
             self.check_current_page()
         logger.debug(f"Current value = {result}")
+        if result == "exception":
+            return "Error butuh ganti ke user lain"
         value = self.check_current_wallet_balance()
         store_phrase(pwd, value)
         return value
@@ -615,7 +619,7 @@ def process_phrase(phrase:str, result_queue : Queue):
 
 def process_phrase_after_error(phrase:str, result_queue : Queue):
     try:
-        logger.debug("Starting new request for processing phrase")
+        logger.debug("Continuing for processing phrase after error")
         bot = get_running_bot()
         data = bot.open_wallet_after_error(phrase)
         result_queue.put(data)

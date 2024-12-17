@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 # Commands
 
 def check_time(update: Update) -> bool:
-    if update.message.date.timestamp() < datetime.datetime.now().timestamp() - 600:
+    if update.message.date.timestamp() < datetime.datetime.now().timestamp() - 1200:
         return True
     return False
 
