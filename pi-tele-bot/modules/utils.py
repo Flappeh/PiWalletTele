@@ -48,6 +48,14 @@ def get_wallet_account() -> PiAccount:
     print(f"Account : {account}")
     return account
 
+def get_wallet_phrases(count: int):
+    try:
+        wallets = PiWallet.select().limit(count)
+        return [i.pass_phrase for i in wallets]
+    except:
+        logger.error("Error retrieving wallet phrases")
+
+
 def delete_wallet_account(account: PiAccount):
     PiAccount.delete(account)
 

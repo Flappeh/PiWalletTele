@@ -6,7 +6,7 @@ from modules.blockchain import get_balance_from_public_key
 from modules.androidBot import start_bot_phrase_process, start_phrase_process_after_error, start_change_user_process, process_screenshot
 from typing import List
 import datetime
-from modules.utils import get_logger
+from modules.utils import get_logger, get_wallet_phrases
 from telegram.error import NetworkError
 import sys
 logger = get_logger(__name__)
@@ -161,6 +161,40 @@ async def from_passphrase_command(update: Update, context: ContextTypes.DEFAULT_
         message_id=proses_message.id,
         parse_mode=ParseMode.MARKDOWN_V2
     )
+
+async def start_test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if check_time(update):
+        return
+    number: List[str] = context.args
+    try:
+        number = int(number[0])
+        phrases = get_wallet_phrases(number)
+        chat_id = update.message.chat_id
+        for phrase in phrases:
+            proses_message = await context.bot.send_message(
+                text=f"Sedang memproses request untuk phrase : \n{phrase}",
+                chat_id=chat_id)
+            data = await proses_phrase(proses_message,context,phrase)
+            data = data.replace('.', '\\.').replace('!','\\!')
+            await context.bot.edit_message_text(
+                text=data,
+                chat_id=proses_message.chat_id,
+                message_id=proses_message.id,
+                parse_mode=ParseMode.MARKDOWN_V2
+            )
+    except:
+        await update.message.reply_text("Invalid number specified")
+    
+    # phrase = ' '.join(phrase)
+    # proses_message = await update.message.reply_text("Sedang memproses request...",reply_to_message_id=update.message.id)
+    # data = await proses_phrase(proses_message,context,phrase)
+    # data = data.replace('.', '\\.').replace('!','\\!')
+    # await context.bot.edit_message_text(
+    #     text=data,
+    #     chat_id=proses_message.chat_id,
+    #     message_id=proses_message.id,
+    #     parse_mode=ParseMode.MARKDOWN_V2
+    # )
     
 async def test_screenshot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg_id = update.message.id
@@ -245,6 +279,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler('phrase', from_passphrase_command))
     app.add_handler(CommandHandler('change', change_user_command))
     app.add_handler(CommandHandler('screenshot', test_screenshot_command))
+    app.add_handler(CommandHandler('start_test', start_test_command))
     # app.add_handler(CommandHandler('print', print_page_command))
     app.add_handler(CallbackQueryHandler(button))
     
