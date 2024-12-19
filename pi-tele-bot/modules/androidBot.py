@@ -294,6 +294,10 @@ class AndroidBot():
                 result = True
             except:
                 logger.error("Unable to sign out")
+                print(self.driver.current_activity)
+                if "pinetwork" not in self.driver.current_activity:
+                    self.driver.activate_app('com.blockchainvault/com.pinetwork.MainActivity')
+                    sleep(3)
             sleep(0.3)
     
     def tap_menu_burger(self) -> None:
@@ -380,7 +384,7 @@ class AndroidBot():
                 self.insert_phone_number(account)
                 if "Enter your password" in self.driver.page_source:
                     break
-            
+            sleep(1)
             self.enter_phone_password(account)
             while "Enter your password" in self.driver.page_source:
                 logger.warning("Still in password form")
@@ -408,7 +412,7 @@ class AndroidBot():
             logger.debug("Navigation to pi network, clicking keep on mining")
             width = floor(self.width * 0.97)
             min_height = floor(self.height * 0.35)
-            max_height = floor(self.height * 0.59)
+            max_height = floor(self.height * 0.76)
             while "Keep on mining" not in self.driver.page_source:
                 if "Mining Session Ends" in self.driver.page_source:
                     self.click_back_button_login()
@@ -421,14 +425,22 @@ class AndroidBot():
                     break
                 if "You just unlocked" in self.driver.page_source:
                     self.dismiss_contributor()
-                for i in range(min_height,max_height,100):
-                    self.driver.tap([(width, i)])
-                    sleep(0.2)
-                if "Mine by confirming" in self.driver.page_source:
-                    self.driver.tap([(150,570)])
-                    sleep(0.3)
-                    self.driver.tap([12,74])
+                if "Referral" in self.driver.page_source:
+                    self.tap_menu_burger()
                     break
+                if "Mine by confirming" in self.driver.page_source:
+                    try:
+                        self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.Button[@text="Mine"]').click()
+                        self.driver.tap([(self.width*0.46,self.height*0.89)])
+                        sleep(0.3)
+                        self.tap_menu_burger()
+                        break
+                    except:
+                        logger.error("Error clicking mine by confirming")
+                for i in range(min_height,max_height,60):
+                    self.driver.tap([(width, i)])
+                    if "Mine by confirming" in self.driver.page_source:
+                        break
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Not Now")]').click()
             self.driver.tap([(50,350)])
         except:
