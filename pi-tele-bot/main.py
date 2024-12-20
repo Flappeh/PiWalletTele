@@ -120,7 +120,7 @@ async def proses_phrase(proses_message, context: ContextTypes.DEFAULT_TYPE, phra
         elif "Error butuh ganti ke user lain" in data:
             await context.bot.edit_message_text(text=f"Limit user tercapai, proses ganti user",chat_id=proses_message.chat_id,message_id=proses_message.id)
             data = start_phrase_process_after_error(phrase)
-            return f"""
+            msg =  f"""
 *Pi Wallet Bot*
 
 *Phrase*: 
@@ -129,16 +129,26 @@ async def proses_phrase(proses_message, context: ContextTypes.DEFAULT_TYPE, phra
 *Jumlah wallet*: 
 {data}
         """
+            if len(data[1]) > 0:
+                msg += "\nPi yang ditahan :\n"
+                for i in data[1]:
+                    msg += f"{i}\n"
+            return msg
         else:
-            return f"""
+            msg =  f"""
 *Pi Wallet Bot*
 
 *Phrase*: 
 {phrase}
 
 *Jumlah wallet*: 
-{data}
+{data[0]}
         """
+            if len(data[1]) > 0:
+                msg += "\nPi yang ditahan :\n"
+                for i in data[1]:
+                    msg += f"{i}\n"
+            return msg
     except Exception as e:
         logger.error(f"Error retrieving passphrase details, {e}")
         return "Error occured, please contact administrator"
@@ -154,7 +164,7 @@ async def from_passphrase_command(update: Update, context: ContextTypes.DEFAULT_
     phrase = ' '.join(phrase)
     proses_message = await update.message.reply_text("Sedang memproses request...",reply_to_message_id=update.message.id)
     data = await proses_phrase(proses_message,context,phrase)
-    data = data.replace('.', '\\.').replace('!','\\!')
+    data = data.replace('.', '\\.').replace('!','\\!').replace('+','\\+')
     await context.bot.edit_message_text(
         text=data,
         chat_id=proses_message.chat_id,

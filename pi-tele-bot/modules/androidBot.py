@@ -124,6 +124,9 @@ class AndroidBot():
         if "Available Balance" in Page_Source:
             self.current_page = "wallet_page"
             return "wallet_page"
+        if "Transaction Details" in Page_Source:
+            self.current_page = "transaction"
+            return "transaction"
         if "Start Mining Pi Effort" in Page_Source:
             self.current_page = "try_mining"
             return "try_mining"
@@ -243,7 +246,7 @@ class AndroidBot():
         logger.debug("Received enter wallet phrase command")
         page = ""
         tries = 0
-        while tries < 6:
+        while tries < 9:
             self.try_enter_wallet(pwd)
             page = self.driver.page_source
             if "Loading" in page:
@@ -438,9 +441,9 @@ class AndroidBot():
                     except:
                         logger.error("Error clicking mine by confirming")
                 for i in range(min_height,max_height,60):
-                    self.driver.tap([(width, i)])
                     if "Mine by confirming" in self.driver.page_source:
                         break
+                    self.driver.tap([(width, i)])
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Not Now")]').click()
             self.driver.tap([(50,350)])
         except:
@@ -541,12 +544,99 @@ class AndroidBot():
             logger.debug("Not in profile page")
             self.open_profile_page()
             self.start_login_user()
+    
+    def check_wallet_history(self):
+        try:
+            if "Nothing to show" in self.driver.page_source:
+                return "0","0"
+            # Keep trying to get history
+            avail = False
+            history = self.driver.find_elements(by=AppiumBy.XPATH, value='//android.widget.ListView/*')
+            idx = 0
+            result = []
+            while idx < len(history):
+                avail = False
+                while avail == False:
+                    try:
+                        history = self.driver.find_elements(by=AppiumBy.XPATH, value='//android.widget.ListView/*')
+                        avail = True
+                    except:
+                        logger.error("Failed to get history")
+                history[idx].click()
+                while "Transaction Details" not in self.driver.page_source:
+                    if "Available Balance" in self.driver.page_source:
+                        history[idx].click()
+                        break
+                    sleep(0.2)
+                # sleep(2)
+                amt, pending, locked = self.sub_wallet_history()
+                result += f"{amt} PI\nMenunggu sampai: {pending},\nTerkunci sampai : {locked}"
+                sleep(2)
+                idx += 1
+            return result
+        except Exception as e:
+            print("Error ", e)
+    
+    def sub_get_pending_history(self):
+        try:
+            logger.info("Getting pending history date")
+            parent = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Pending")]/..')
+            child = parent.find_elements(by=AppiumBy.CLASS_NAME, value="android.widget.TextView")
+            res = f"{child[1].text} {child[2].text}"
+            print(res)
+            return res 
+        except Exception as e:
+            logger.error(f"Error getting pending history date")
+            return ""
+    
+    def sub_get_locked_history(self):
+        try:
+            logger.info("Getting locked history date")
+            parent = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Locked")]/..')
+            child = parent.find_elements(by=AppiumBy.CLASS_NAME, value="android.widget.TextView")
+            res = f"{child[1].text} {child[2].text}"
+            print(res)
+            return res 
+        except:
+            logger.error("Error getting locked history date")
+            return ""
+    
+    def sub_wallet_history(self):
+        try:
+            logger.debug("Checking history for the wallet")
+            while "From" not in self.driver.page_source:
+                print(1)
+                sleep(0.2)
+            
+            # Coin Amount
+            view = self.driver.find_elements(by=AppiumBy.XPATH, value='//android.app.Dialog/android.view.View[2]/*')
+            sleep(1)
+            amount = view[1].text
+            
+            # Get date details
+            self.driver.flick(self.width*0.5,self.height*0.5,self.width*0.5,self.height*0.1)
+            sleep(2)
+            
+            pending_date = self.sub_get_pending_history()
+            locked_date = self.sub_get_locked_history()
+            
+            
+            while "Dismiss" in self.driver.page_source:
+                self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Dismiss")]').click()
+                sleep(0.2)
+            return amount,pending_date,locked_date
+        
+        except:
+            logger.error("Unable to check history for the element")
+            return "0","0"
         
     def open_wallet_from_passphrase(self, pwd: str):
         self.driver.activate_app('pi.browser/com.pinetwork.MainActivity')
         logger.info(f"Received new request for phrase: {pwd}")
         current_page = self.check_current_page()
         if current_page == "wallet_home":
+            self.click_back_button()
+        elif current_page == "transaction":
             self.click_back_button()
         else:
             self.navigate_to_wallet_home()
@@ -571,7 +661,17 @@ class AndroidBot():
             return "Error butuh ganti ke user lain"
         value = self.check_current_wallet_balance()
         store_phrase(pwd, value)
-        return value
+        
+        print("Done checking bla")
+        # Get data of held coins
+        data = []
+        try:
+            result = self.check_wallet_history()
+            data.append(result)
+        except:
+            logger.error
+            
+        return (value, data)
     
     def open_wallet_after_error(self, pwd: str):
         self.change_user()
