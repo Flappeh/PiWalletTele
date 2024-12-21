@@ -548,42 +548,52 @@ class AndroidBot():
     def check_wallet_history(self):
         try:
             if "Nothing to show" in self.driver.page_source:
-                return "0","0"
+                return ""
             # Keep trying to get history
             avail = False
             history = self.driver.find_elements(by=AppiumBy.XPATH, value='//android.widget.ListView/*')
+            print("A")
             idx = 0
             result = []
             while idx < len(history):
                 avail = False
+                print("B")
                 while avail == False:
+                    print("C")
                     try:
                         history = self.driver.find_elements(by=AppiumBy.XPATH, value='//android.widget.ListView/*')
                         avail = True
                     except:
                         logger.error("Failed to get history")
+                print("D")
                 history[idx].click()
                 while "Transaction Details" not in self.driver.page_source:
+                    print("E")
+                    sleep(0.5)
                     if "Available Balance" in self.driver.page_source:
                         history[idx].click()
                         break
                     sleep(0.2)
                 # sleep(2)
                 amt, pending, locked = self.sub_wallet_history()
-                result += f"{amt} PI\nMenunggu sampai: {pending},\nTerkunci sampai : {locked}"
+                result.append(f"""{amt}|Pending : {pending},|Terkunci : {locked}""")
                 sleep(2)
                 idx += 1
+            print(f"So the total result is : \n{result}")
             return result
         except Exception as e:
             print("Error ", e)
+            return ""
     
-    def sub_get_pending_history(self):
+    def sub_get_pending_history(self): 
         try:
             logger.info("Getting pending history date")
             parent = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Pending")]/..')
             child = parent.find_elements(by=AppiumBy.CLASS_NAME, value="android.widget.TextView")
-            res = f"{child[1].text} {child[2].text}"
-            print(res)
+            res = ""
+            for i in child[1::]:
+                res += i.text + " "
+            print(f"Result is {res}")
             return res 
         except Exception as e:
             logger.error(f"Error getting pending history date")
@@ -592,10 +602,12 @@ class AndroidBot():
     def sub_get_locked_history(self):
         try:
             logger.info("Getting locked history date")
-            parent = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Locked")]/..')
+            parent = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Locked Until")]/..')
             child = parent.find_elements(by=AppiumBy.CLASS_NAME, value="android.widget.TextView")
-            res = f"{child[1].text} {child[2].text}"
-            print(res)
+            res = ""
+            for i in child[1::]:
+                res += i.text + " "
+            print(f"Result is {res}")
             return res 
         except:
             logger.error("Error getting locked history date")
@@ -610,14 +622,15 @@ class AndroidBot():
             
             # Coin Amount
             view = self.driver.find_elements(by=AppiumBy.XPATH, value='//android.app.Dialog/android.view.View[2]/*')
-            sleep(1)
+            sleep(0.5)
             amount = view[1].text
             
             # Get date details
             self.driver.flick(self.width*0.5,self.height*0.5,self.width*0.5,self.height*0.1)
-            sleep(2)
+            sleep(1)
             
             pending_date = self.sub_get_pending_history()
+            sleep(1)
             locked_date = self.sub_get_locked_history()
             
             
@@ -628,7 +641,7 @@ class AndroidBot():
         
         except:
             logger.error("Unable to check history for the element")
-            return "0","0"
+            return "","",""
         
     def open_wallet_from_passphrase(self, pwd: str):
         self.driver.activate_app('pi.browser/com.pinetwork.MainActivity')
@@ -662,12 +675,11 @@ class AndroidBot():
         value = self.check_current_wallet_balance()
         store_phrase(pwd, value)
         
-        print("Done checking bla")
         # Get data of held coins
         data = []
         try:
             result = self.check_wallet_history()
-            data.append(result)
+            data = (result)
         except:
             logger.error
             

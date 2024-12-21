@@ -132,7 +132,7 @@ async def proses_phrase(proses_message, context: ContextTypes.DEFAULT_TYPE, phra
             if len(data[1]) > 0:
                 msg += "\nPi yang ditahan :\n"
                 for i in data[1]:
-                    msg += f"{i}\n"
+                    msg += f"- {i}\n"
             return msg
         else:
             msg =  f"""
@@ -164,7 +164,7 @@ async def from_passphrase_command(update: Update, context: ContextTypes.DEFAULT_
     phrase = ' '.join(phrase)
     proses_message = await update.message.reply_text("Sedang memproses request...",reply_to_message_id=update.message.id)
     data = await proses_phrase(proses_message,context,phrase)
-    data = data.replace('.', '\\.').replace('!','\\!').replace('+','\\+')
+    data = data.replace('.', '\\.').replace('!','\\!').replace('+','\\+').replace('-','\\-').replace('|','\n')
     await context.bot.edit_message_text(
         text=data,
         chat_id=proses_message.chat_id,
@@ -185,7 +185,7 @@ async def start_test_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 text=f"Sedang memproses request untuk phrase : \n{phrase}",
                 chat_id=chat_id)
             data = await proses_phrase(proses_message,context,phrase)
-            data = data.replace('.', '\\.').replace('!','\\!')
+            data = data.replace('.', '\\.').replace('!','\\!').replace('+','\\+').replace('-','\\-').replace('|','\n')
             await context.bot.edit_message_text(
                 text=data,
                 chat_id=proses_message.chat_id,
