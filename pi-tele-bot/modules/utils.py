@@ -4,7 +4,7 @@ import logging
 import sys
 from .database import PiWallet,PiAccount
 from datetime import datetime, timedelta
-
+import random
 dir_path = os.path.dirname(os.path.realpath(__file__))
 loggers = {}
 
@@ -50,8 +50,9 @@ def get_wallet_account() -> PiAccount:
 
 def get_wallet_phrases(count: int):
     try:
-        wallets = PiWallet.select().limit(count)
-        return [i.pass_phrase for i in wallets]
+        wallets = PiWallet.select().where(PiWallet.balance != "0.00 Pi")
+        data = random.sample([i for i in wallets],count)
+        return [i.pass_phrase for i in data]
     except:
         logger.error("Error retrieving wallet phrases")
 

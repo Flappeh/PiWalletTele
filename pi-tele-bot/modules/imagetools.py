@@ -56,7 +56,6 @@ def check_dismiss_login():
       return True
    return False
 
-check_dismiss_login()
 
 def match_template() -> bool:
    to_check = "./data/tmp.png"

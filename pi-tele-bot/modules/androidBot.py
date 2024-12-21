@@ -138,6 +138,12 @@ class AndroidBot():
             self.click_update()
             self.current_page = "update"
             return "update"
+        if "blockexplorer" in Page_Source:
+            self.current_page = "blockexplorer"
+            return "blockexplorer"
+        if "System UI isn't" in Page_Source:
+            self.current_page = "systemerr"
+            return "systemerr"
         
         return ""
 
@@ -191,9 +197,16 @@ class AndroidBot():
                     logger.error("Error going to sub page")
             self.click_notif()
             pass
-            
+    def reset_system_app(self):
+        try:
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Close app")]').click()
+            sleep(3)
+            self.driver.activate_app('pi.browser/com.pinetwork.MainActivity')
+        except:
+            logger.error("Error resetting system UI after error")
     def navigate_to_wallet_home(self):
         current_page = self.check_current_page()
+        tries = 0
         while current_page != "wallet_home": 
             logger.debug(f"Current page before match: {current_page}")  # Debugging line
             match current_page:
@@ -203,17 +216,26 @@ class AndroidBot():
                     self.reload_wallet_page()
                 case "home":
                     self.open_wallet_sub_page()
+                case "transaction":
+                    self.tap_menu_burger()
                 case "loading":
                     logger.debug("Still loading")
                 case "notification":
                     logger.debug("Notification Found")
                 case "update":
                     logger.debug("Update notification found")
+                    if tries > 20:
+                        self.tap_menu_burger()
                 case "verification":
                     self.verify_wallet()
+                case "blockexplorer":
+                    self.tap_menu_burger()
+                case "systemerr":
+                    self.reset_system_app()
                 case _:
                     logger.warning("Got undefined while navigating to wallet home")
                     sleep(1)
+                    tries += 1
             current_page = self.check_current_page()
             logger.debug(f"Current page after match: {current_page}")  # Debugging line
     
@@ -342,14 +364,19 @@ class AndroidBot():
             #     print("Clicking register with phone number")
             #     self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "with phone number")]').click()
             #     sleep(0.2)
-            country_box = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "United States")]')
-            country_box.click()
+            input_boxes = self.driver.find_elements(by=AppiumBy.CLASS_NAME, value='android.widget.EditText')
+            # country_box = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "United States")]')
+            country_box = input_boxes[0]
+            # country_box.click()
             sleep(0.2)
-            # country_box.send_keys("indonesia")
-            self.enter_keyboard_indonesia()
-            self.driver.hide_keyboard()
-            self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.TextView[contains(@text, "Phone number")]').click()
-            phone_box = self.driver.find_element(by=AppiumBy.XPATH, value='//android.view.View[@resource-id="root"]/android.view.View/android.view.View/android.view.View/android.view.View[3]/android.widget.EditText')
+            country_box.send_keys("indonesia")
+            sleep(0.2)
+            self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.TextView[@text="Phone number:"]').click()
+            # self.enter_keyboard_indonesia()
+            # self.driver.hide_keyboard()
+            # self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.TextView[contains(@text, "Phone number")]').click()
+            # phone_box = self.driver.find_element(by=AppiumBy.XPATH, value='//android.view.View[@resource-id="root"]/android.view.View/android.view.View/android.view.View/android.view.View[3]/android.widget.EditText')
+            phone_box = input_boxes[1]
             phone_box.send_keys(account.phone)
             logger.debug("Clicking submit button")
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Submit")]').click()
@@ -562,23 +589,18 @@ class AndroidBot():
             # Keep trying to get history
             avail = False
             history = self.driver.find_elements(by=AppiumBy.XPATH, value='//android.widget.ListView/*')
-            print("A")
             idx = 0
             result = []
             while idx < len(history):
                 avail = False
-                print("B")
                 while avail == False:
-                    print("C")
                     try:
                         history = self.driver.find_elements(by=AppiumBy.XPATH, value='//android.widget.ListView/*')
                         avail = True
                     except:
                         logger.error("Failed to get history")
-                print("D")
                 history[idx].click()
                 while "Transaction Details" not in self.driver.page_source:
-                    print("E")
                     sleep(0.5)
                     if "Available Balance" in self.driver.page_source:
                         history[idx].click()
@@ -588,9 +610,9 @@ class AndroidBot():
                 amt, pending, locked, success = self.sub_wallet_history()
                 if  success == True:
                     result.append(f"""{amt}|Pending : {pending},|Terkunci : {locked}""")
-                sleep(2)
+                sleep(1)
                 idx += 1
-            print(f"So the total result is : \n{result}")
+            # print(f"So the total result is : \n{result}")
             return result
         except Exception as e:
             print("Error ", e)
@@ -604,7 +626,6 @@ class AndroidBot():
             res = ""
             for i in child[1::]:
                 res += i.text + " "
-            print(f"Result is {res}")
             return res 
         except Exception as e:
             logger.error(f"Error getting pending history date")
@@ -642,6 +663,7 @@ class AndroidBot():
             sleep(1)
             
             if "Locked Until" not in self.driver.page_source:
+                self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Dismiss")]').click()
                 raise
             
             pending_date = self.sub_get_pending_history()

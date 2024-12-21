@@ -127,12 +127,12 @@ async def proses_phrase(proses_message, context: ContextTypes.DEFAULT_TYPE, phra
 {phrase}
 
 *Jumlah wallet*: 
-{data}
+{data[0]}
         """
             if len(data[1]) > 0:
                 msg += "\nPi yang ditahan :\n"
                 for i in data[1]:
-                    msg += f"- {i}\n"
+                    msg += f"{i}\n"
             return msg
         else:
             msg =  f"""
@@ -147,7 +147,7 @@ async def proses_phrase(proses_message, context: ContextTypes.DEFAULT_TYPE, phra
             if len(data[1]) > 0:
                 msg += "\nPi yang ditahan :\n"
                 for i in data[1]:
-                    msg += f"- {i}\n"
+                    msg += f"{i}\n"
             return msg
     except Exception as e:
         logger.error(f"Error retrieving passphrase details, {e}")
@@ -192,7 +192,8 @@ async def start_test_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 message_id=proses_message.id,
                 parse_mode=ParseMode.MARKDOWN_V2
             )
-    except:
+    except Exception as e:
+        print(e)
         await update.message.reply_text("Invalid number specified")
     
     # phrase = ' '.join(phrase)
