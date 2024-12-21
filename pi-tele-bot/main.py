@@ -147,7 +147,7 @@ async def proses_phrase(proses_message, context: ContextTypes.DEFAULT_TYPE, phra
             if len(data[1]) > 0:
                 msg += "\nPi yang ditahan :\n"
                 for i in data[1]:
-                    msg += f"{i}\n"
+                    msg += f"- {i}\n"
             return msg
     except Exception as e:
         logger.error(f"Error retrieving passphrase details, {e}")

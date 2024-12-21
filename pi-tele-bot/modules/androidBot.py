@@ -428,7 +428,7 @@ class AndroidBot():
                     break
                 if "You just unlocked" in self.driver.page_source:
                     self.dismiss_contributor()
-                if "Referral" in self.driver.page_source:
+                if "Referral" in self.driver.page_source or "Sharing text" in self.driver.page_source:
                     self.tap_menu_burger()
                     break
                 if "Mine by confirming" in self.driver.page_source:
@@ -443,6 +443,13 @@ class AndroidBot():
                 for i in range(min_height,max_height,60):
                     if "Mine by confirming" in self.driver.page_source:
                         break
+                    if "Referral" in self.driver.page_source:
+                        break
+                    if "Mining Session Ends" in self.driver.page_source:
+                        break
+                    if "Sharing" in self.driver.page_source:
+                        break
+                    sleep(0.1)
                     self.driver.tap([(width, i)])
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Not Now")]').click()
             self.driver.tap([(50,350)])
@@ -464,7 +471,7 @@ class AndroidBot():
             # self.driver.flick(100,400,100,100)
             sleep(1)
             try:
-                self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Alternative Sign")]').click()
+                self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Sign In")]').click()
             except:
                 pass
             current_tries = 0
@@ -510,6 +517,9 @@ class AndroidBot():
         try:
             logger.debug("Handling user verification")
             if "Sign out" in self.driver.page_source or  "Sign Out" in self.driver.page_source:
+                return True
+            if "Total mining" in self.driver.page_source:
+                self.tap_menu_burger()
                 return True
             elif "Continue with phone" in self.driver.page_source or "Please verify your identity" in self.driver.page_source:
                 return True
@@ -575,8 +585,9 @@ class AndroidBot():
                         break
                     sleep(0.2)
                 # sleep(2)
-                amt, pending, locked = self.sub_wallet_history()
-                result.append(f"""{amt}|Pending : {pending},|Terkunci : {locked}""")
+                amt, pending, locked, success = self.sub_wallet_history()
+                if  success == True:
+                    result.append(f"""{amt}|Pending : {pending},|Terkunci : {locked}""")
                 sleep(2)
                 idx += 1
             print(f"So the total result is : \n{result}")
@@ -617,7 +628,8 @@ class AndroidBot():
         try:
             logger.debug("Checking history for the wallet")
             while "From" not in self.driver.page_source:
-                print(1)
+                if "Locked Until" not in self.driver.page_source:
+                    raise
                 sleep(0.2)
             
             # Coin Amount
@@ -629,6 +641,9 @@ class AndroidBot():
             self.driver.flick(self.width*0.5,self.height*0.5,self.width*0.5,self.height*0.1)
             sleep(1)
             
+            if "Locked Until" not in self.driver.page_source:
+                raise
+            
             pending_date = self.sub_get_pending_history()
             sleep(1)
             locked_date = self.sub_get_locked_history()
@@ -637,11 +652,11 @@ class AndroidBot():
             while "Dismiss" in self.driver.page_source:
                 self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Dismiss")]').click()
                 sleep(0.2)
-            return amount,pending_date,locked_date
+            return amount,pending_date,locked_date, True
         
         except:
             logger.error("Unable to check history for the element")
-            return "","",""
+            return "","","", False
         
     def open_wallet_from_passphrase(self, pwd: str):
         self.driver.activate_app('pi.browser/com.pinetwork.MainActivity')
