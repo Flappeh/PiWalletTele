@@ -10,6 +10,7 @@ from .exceptions import PiAccountError
 from time import sleep,time
 from multiprocessing import Process, Queue
 from .imagetools import match_template
+from datetime import datetime
 import os
 
 TIMEOUT = TIMEOUT_LIMIT
@@ -224,7 +225,7 @@ class AndroidBot():
                     logger.debug("Notification Found")
                 case "update":
                     logger.debug("Update notification found")
-                    if tries > 20:
+                    if tries > 50:
                         self.tap_menu_burger()
                 case "verification":
                     self.verify_wallet()
@@ -235,7 +236,7 @@ class AndroidBot():
                 case _:
                     logger.warning("Got undefined while navigating to wallet home")
                     sleep(1)
-                    tries += 1
+            tries += 1
             current_page = self.check_current_page()
             logger.debug(f"Current page after match: {current_page}")  # Debugging line
     
@@ -582,35 +583,63 @@ class AndroidBot():
             self.open_profile_page()
             self.start_login_user()
     
+    def click_dismiss_history(self):
+        try:
+            logger.debug("Clicking dismiss on history")
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Dismiss")]').click()
+        except:
+            logger.error("Error clicking dismiss history")
+    
+    def click_history_item(self, index):
+        try:
+            logger.debug(f"Clicking history with index of : {index}")
+            history = self.driver.find_element(by=AppiumBy.CLASS_NAME, value='android.widget.ListView')
+            children = history.find_elements(by=AppiumBy.CLASS_NAME, value='android.widget.Button')
+            children[index].click()
+            sleep(1)
+            if "Locked Up Balance" not in self.driver.page_source:
+                self.click_dismiss_history()
+                raise
+            return True
+        except:
+            logger.error(f"Error clicking history widget button")
+            return False
+    
     def check_wallet_history(self):
         try:
             if "Nothing to show" in self.driver.page_source:
                 return ""
             # Keep trying to get history
             avail = False
-            history = self.driver.find_elements(by=AppiumBy.XPATH, value='//android.widget.ListView/*')
+            history_list = self.driver.find_element(by=AppiumBy.CLASS_NAME, value='android.widget.ListView')
+            children = history_list.find_elements(by=AppiumBy.CLASS_NAME, value='android.widget.Button')
             idx = 0
             result = []
-            while idx < len(history):
-                avail = False
-                while avail == False:
-                    try:
-                        history = self.driver.find_elements(by=AppiumBy.XPATH, value='//android.widget.ListView/*')
-                        avail = True
-                    except:
-                        logger.error("Failed to get history")
-                history[idx].click()
-                while "Transaction Details" not in self.driver.page_source:
-                    sleep(0.5)
-                    if "Available Balance" in self.driver.page_source:
-                        history[idx].click()
-                        break
-                    sleep(0.2)
-                # sleep(2)
-                amt, pending, locked, success = self.sub_wallet_history()
-                if  success == True:
-                    result.append(f"""{amt}|Pending : {pending},|Terkunci : {locked}""")
+            while idx < len(children):
+                # avail = False
+                # while avail == False:
+                #     try:
+                #         if "Dismiss" in self.driver.page_source:
+                #             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Dismiss")]').click()
+                #         get_history_widgetself.
+                #         avail = True
+                #     except:
+                #         logger.error("Failed to get history")
                 sleep(1)
+                is_history = self.click_history_item(idx)
+                # while "Transaction Details" not in self.driver.page_source:
+                #     sleep(0.5)
+                #     if "Available Balance" in self.driver.page_source:
+                #         self.click_history_item(idx)
+                #         break
+                #     sleep(0.2)
+                # sleep(2)
+                if is_history:
+                    amt, pending, locked, success = self.sub_wallet_history()
+                    if success == True:
+                        result.append(f"""{amt}|Pending : {pending},|Terkunci : {locked}""")
+                sleep(1)
+                print('Here')
                 idx += 1
             # print(f"So the total result is : \n{result}")
             return result
@@ -644,12 +673,26 @@ class AndroidBot():
         except:
             logger.error("Error getting locked history date")
             return ""
-    
+    def decide_locked_date(self, input: str):
+        try:
+            logger.debug("Parsing date from history item")
+            input = input.lstrip().rstrip()
+            res = datetime.strptime(input, "%Y-%m-%d %H:%M:%S")
+            print(res)
+            if res > datetime.now():
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Error parsing date from history, {e}")
+            return False
     def sub_wallet_history(self):
         try:
             logger.debug("Checking history for the wallet")
             while "From" not in self.driver.page_source:
-                if "Locked Until" not in self.driver.page_source:
+                print("Waiting from")
+                if "Dismiss" in self.driver.page_source:
+                    raise
+                if "Locked Until" not in self.driver.page_source and "Fee" in self.driver.page_source:
                     raise
                 sleep(0.2)
             
@@ -670,9 +713,14 @@ class AndroidBot():
             sleep(1)
             locked_date = self.sub_get_locked_history()
             
+            if locked_date == "":
+                raise
             
+            if self.decide_locked_date(locked_date) == False:
+                raise
             while "Dismiss" in self.driver.page_source:
                 self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Dismiss")]').click()
+                print("Dismiss")
                 if "blockexplorer" in self.driver.page_source:
                     self.tap_menu_burger()
                     break
