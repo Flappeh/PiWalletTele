@@ -128,9 +128,6 @@ class AndroidBot():
         if "Transaction Details" in Page_Source:
             self.current_page = "transaction"
             return "transaction"
-        if "Start Mining Pi Effort" in Page_Source:
-            self.current_page = "try_mining"
-            return "try_mining"
         if "Allow Pi Browser to send" in Page_Source:
             self.click_phone_notif()
             self.current_page = "phone_notif"
@@ -142,6 +139,9 @@ class AndroidBot():
         if "blockexplorer" in Page_Source:
             self.current_page = "blockexplorer"
             return "blockexplorer"
+        if "Start Mining Pi Effort" in Page_Source or "try mining now" in self.driver.page_source.lower():
+            self.current_page = "try_mining"
+            return "try_mining"
         if "System UI isn't" in Page_Source:
             self.current_page = "systemerr"
             return "systemerr"
@@ -266,10 +266,24 @@ class AndroidBot():
     #         logger.error("Unable to capture screen, error ", e)
     
     def enter_wallet_phrase(self, pwd:str)-> str:
+        
         logger.debug("Received enter wallet phrase command")
         page = ""
         tries = 0
+        check_page = 0
         while tries < 9:
+            while self.check_current_page() != "wallet_home":
+                if check_page == 20:
+                    app = self.driver.current_package
+                    self.driver.terminate_app(app)
+                    sleep(1)
+                    self.driver.activate_app(app)
+                    sleep(1)
+                    self.open_wallet_sub_page()
+                sleep(1)
+                if self.check_current_page() == "wallet_page":
+                    break
+                check_page += 1
             self.try_enter_wallet(pwd)
             page = self.driver.page_source
             if "Loading" in page:
@@ -308,10 +322,13 @@ class AndroidBot():
         result = False
         while result == False:
             if "Continue with phone number" in self.driver.page_source:
+                result = True
                 break
             if "Register with phone number" in self.driver.page_source:
+                result = True
                 break
             if "Enter your password" in self.driver.page_source:
+                result = True
                 break
             try:
                 self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Sign Out")]').click()
@@ -321,10 +338,13 @@ class AndroidBot():
             except:
                 logger.error("Unable to sign out")
                 print(self.driver.current_activity)
-                if "pinetwork" not in self.driver.current_activity:
+                if "blockchainvault" not in self.driver.current_package:
                     self.driver.activate_app('com.blockchainvault/com.pinetwork.MainActivity')
                     sleep(3)
+                result = False
+                break
             sleep(0.3)
+        return result
     
     def tap_menu_burger(self) -> None:
         try:
@@ -333,20 +353,30 @@ class AndroidBot():
             self.driver.tap([(menu_burger)])
         except:
             logger.error("Error tapping menu burger")
-            
+    
     def open_profile_page(self) -> None:
-        logger.debug("Opening profile page")
-        if "Referral Team" not in self.driver.page_source and "Node" not in self.driver.page_source:
-            self.tap_menu_burger()
-        sleep(1)
-        self.driver.flick(100,self.height*0.5,100,self.height*0.2)
-        sleep(1)
         try:
-            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Profile")]').click()
+            if "Referral Team" not in self.driver.page_source and "Node" not in self.driver.page_source:
+                self.tap_menu_burger()
+                sleep(1)
+            self.driver.flick(100,self.height*0.5,100,self.height*0.2)
+            sleep(1)
+            try:
+                self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Profile")]').click()
+            except:
+                logger.error("Error clicking profile button")
+                self.driver.tap([(self.width*0.23,self.height*0.79)])
+            sleep(1)
         except:
-            logger.error("Error clicking profile button")
-        sleep(1)
-        self.sign_out_user()
+            logger.error("Error opening profile page")
+            raise
+        
+    def start_logout_user(self) -> None:
+        logger.debug("Opening profile page")
+        self.open_profile_page()
+        while self.sign_out_user() == False:
+            self.open_profile_page()
+            self.sign_out_user()
         
     def enter_keyboard_indonesia(self):
         self.driver.press_keycode(37)
@@ -461,6 +491,7 @@ class AndroidBot():
                     break
                 if "Mine by confirming" in self.driver.page_source:
                     try:
+                        sleep(1)
                         self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.Button[@text="Mine"]').click()
                         self.driver.tap([(self.width*0.46,self.height*0.89)])
                         sleep(0.3)
@@ -499,12 +530,15 @@ class AndroidBot():
             # self.driver.flick(100,400,100,100)
             sleep(1)
             try:
-                self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Sign In")]').click()
+                self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Alternative Sign In")]').click()
             except:
                 pass
             current_tries = 0
             result = False
             while current_tries < 5:
+                if "pi.browser" in self.driver.current_package:
+                    result = True
+                    break
                 if "Welcome to the Pi Browser" in self.driver.page_source:
                     logger.debug("Successfully logged into browser")
                     result = True
@@ -580,7 +614,7 @@ class AndroidBot():
             self.start_login_user()
         else:
             logger.debug("Not in profile page")
-            self.open_profile_page()
+            self.start_logout_user()
             self.start_login_user()
     
     def click_dismiss_history(self):
