@@ -255,15 +255,15 @@ class AndroidBot():
             logger.error("Error entering wallet phrase")
             return False
     
-    def check_if_invalid(self):
-        try:
-            logger.info("Taking picture")
-            tmp_dir = os.getcwd() + '/data/'
-            self.driver.save_screenshot(tmp_dir + 'tmp.png')
-            result = match_template()
-            print(f"Result is {'Found' if result else 'Not Found'}")
-        except Exception as e:
-            logger.error("Unable to capture screen, error ", e)
+    # def check_if_invalid(self):
+    #     try:
+    #         logger.info("Taking picture")
+    #         tmp_dir = os.getcwd() + '/data/'
+    #         self.driver.save_screenshot(tmp_dir + 'tmp.png')
+    #         result = match_template()
+    #         print(f"Result is {'Found' if result else 'Not Found'}")
+    #     except Exception as e:
+    #         logger.error("Unable to capture screen, error ", e)
     
     def enter_wallet_phrase(self, pwd:str)-> str:
         logger.debug("Received enter wallet phrase command")

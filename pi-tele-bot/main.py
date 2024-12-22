@@ -3,7 +3,7 @@ from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
 from modules.environment import BOT_USERNAME,TOKEN
 from modules.blockchain import get_balance_from_public_key
-from modules.androidBot import start_bot_phrase_process, start_phrase_process_after_error, start_change_user_process, process_screenshot
+from modules.androidBot import start_bot_phrase_process, start_phrase_process_after_error, start_change_user_process
 from typing import List
 import datetime
 from modules.utils import get_logger, get_wallet_phrases
@@ -207,11 +207,11 @@ async def start_test_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     #     parse_mode=ParseMode.MARKDOWN_V2
     # )
     
-async def test_screenshot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg_id = update.message.id
-    if check_time(update):
-        return
-    process_screenshot()
+# async def test_screenshot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+#     msg_id = update.message.id
+#     if check_time(update):
+#         return
+#     process_screenshot()
     # await context.bot.send_message(msg_id,"Done processing")
 
 # async def print_page_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -289,7 +289,6 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler('wallet', from_wallet_command))
     app.add_handler(CommandHandler('phrase', from_passphrase_command))
     app.add_handler(CommandHandler('change', change_user_command))
-    app.add_handler(CommandHandler('screenshot', test_screenshot_command))
     app.add_handler(CommandHandler('start_test', start_test_command))
     # app.add_handler(CommandHandler('print', print_page_command))
     app.add_handler(CallbackQueryHandler(button))
