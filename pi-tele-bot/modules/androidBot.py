@@ -9,7 +9,7 @@ from .utils import get_logger, store_phrase, get_wallet_account, PiAccount, dele
 from .exceptions import PiAccountError
 from time import sleep,time
 from multiprocessing import Process, Queue
-from .imagetools import match_template
+# from .imagetools import match_template
 from datetime import datetime
 import os
 
@@ -810,13 +810,13 @@ def get_running_bot():
     logger.info(f"Running bot count : {len(running_bot)}")
     return bot
 
-def process_screenshot():
-    try:
-        logger.debug("Starting new request to take screenshot")
-        bot = get_running_bot()
-        bot.check_if_invalid()
-    except:
-        logger.error("Error taking screenshot")
+# def process_screenshot():
+#     try:
+#         logger.debug("Starting new request to take screenshot")
+#         bot = get_running_bot()
+#         bot.check_if_invalid()
+#     except:
+#         logger.error("Error taking screenshot")
 
 def process_phrase(phrase:str, result_queue : Queue):
     try:
