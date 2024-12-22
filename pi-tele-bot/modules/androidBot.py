@@ -673,6 +673,9 @@ class AndroidBot():
             
             while "Dismiss" in self.driver.page_source:
                 self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Dismiss")]').click()
+                if "blockexplorer" in self.driver.page_source:
+                    self.tap_menu_burger()
+                    break
                 sleep(0.2)
             return amount,pending_date,locked_date, True
         
@@ -818,7 +821,7 @@ def start_background_process(target: Any, phrase: str = None):
         current_process.terminate()
         kill_all_apps()
         current_process.join()
-        return "timeout"
+        return "timeout",""
     return result.get()
     
 def start_bot_phrase_process(phrase:str):
