@@ -1,6 +1,6 @@
 services:
   pi-wallet-bot:
-    image: pi-wallet-bot:2.0.5
+    image: pi-wallet-bot:2.0.7
     restart: always
     network_mode: host
     environment:

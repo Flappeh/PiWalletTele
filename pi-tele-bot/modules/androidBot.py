@@ -242,6 +242,8 @@ class AndroidBot():
     
     def try_enter_wallet(self, pwd:str):
         try:
+            if "Unlock Pi Wallet" not in self.driver.page_source and "Lost your passphrase" not in self.driver.page_source:
+                raise
             logger.debug("Trying to enter wallet phrase")
             login_box = self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.EditText')
             sleep(0.4)
@@ -398,6 +400,8 @@ class AndroidBot():
             input_boxes = self.driver.find_elements(by=AppiumBy.CLASS_NAME, value='android.widget.EditText')
             # country_box = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "United States")]')
             country_box = input_boxes[0]
+            if "facebook" in country_box.text.lower():
+                raise
             # country_box.click()
             sleep(0.2)
             country_box.send_keys("indonesia")
@@ -566,9 +570,8 @@ class AndroidBot():
             while "Continue with phone" not in self.driver.page_source:
                 pass
             login_result = self.login_with_phone_number()
-            if login_result == False:
-                while login_result == False:
-                    login_result = self.login_with_phone_number()
+            while login_result == False:
+                login_result = self.login_with_phone_number()
             self.navigate_to_pi_network()
             if self.login_to_browser() == False:
                 self.change_user()
