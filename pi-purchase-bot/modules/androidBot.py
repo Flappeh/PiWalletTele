@@ -4,10 +4,12 @@ from appium.options.common.base import AppiumOptions
 from appium.webdriver.common.appiumby import AppiumBy
 from appium.webdriver.webelement import WebElement
 from .environment import ANDROID_SERVER_URL, TIMEOUT_LIMIT, WALLET_DEST, TRY_SEND_DURATION
+from math import floor
 from .utils import get_logger, store_phrase, get_wallet_account, PiAccount, delete_wallet_account
 from .exceptions import PiAccountError
 from time import sleep,time
 from multiprocessing import Process, Queue
+from datetime import datetime
 
 TIMEOUT = TIMEOUT_LIMIT
 logger = get_logger(__name__)
@@ -25,8 +27,11 @@ capabilities: Dict[str, Any] = {
 class AndroidBot():
     def __init__(self) -> None:
         self.driver: webdriver.Remote = webdriver.Remote(ANDROID_SERVER_URL, options=AppiumOptions().load_capabilities(capabilities))
+        self.driver.update_settings({"waitForIdleTimeout": 0})
         self.current_page = ""
         self.age = time()
+        self.width = self.driver.get_window_size()["width"]
+        self.height = self.driver.get_window_size()["height"]
         
     def click_update(self) -> None:
         try:
@@ -44,14 +49,22 @@ class AndroidBot():
             notif.click()
         except:
             pass
-
-    def verify_wallet(self) -> None:
+    def click_phone_notif(self) -> None:
+        try:
+            logger.debug("Clicking phone notification")
+            notif = self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.Button[@resource-id="com.android.permissioncontroller:id/permission_deny_button"]')
+            notif.click()
+        except:
+            pass
+    def verify_wallet(self) -> bool:
         try:
             logger.debug("Verifying wallet ownership")
             self.driver.find_element(by=AppiumBy.XPATH, value="//android.widget.Button[contains(@text,'Continue')]").click()
+            sleep(1)
+            return True
         except:
             logger.warning("Unable to verify")
-
+            return False
     def check_is_loading(self):
         loading_screen = self.driver.find_element(by=AppiumBy.XPATH, value='//*[@text="Loading..."]')
         if loading_screen:
@@ -66,48 +79,73 @@ class AndroidBot():
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[@resource-id="address-bar-back-button"]').click()
         except:
             logger.error("Error clicking back button")
+
+    def click_back_button_login(self):
+        try:
+            logger.debug("Clicking back button")
+            self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.Button[@text="Open drawer"]').click()
+        except:
+            logger.error("Error clicking back button")
     
     def click_remind_button(self):
         try:
             logger.debug("Clicking remind later")
-            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Remind Me Later")]').click()
+            self.driver.tap([(260,60)])
         except:
             logger.error("Error clicking remind later")
-    
+    def click_try_mining(self):
+        try:
+            logger.debug("Found start mining popup")
+            self.driver.tap()
+        except:
+            logger.error("Unable to click try mining")
+            
     def check_current_page(self):
         Page_Source = self.driver.page_source
         if "Welcome to the Pi Browser" in Page_Source:
+            self.current_page = "home"
             return "home"
         if "Loading" in Page_Source:
+            self.current_page = "loading"
             return "loading"
         if "Unlock Pi Wallet" in Page_Source:
+            self.current_page = "wallet_home"
             return "wallet_home"
         if "Turn on notifications!" in Page_Source:
             self.click_notif()
+            self.current_page = "notification"
             return "notification"
-        if "Update your app" in Page_Source:
-            self.click_update()
-            return "update"
         if "This is your identity on the Pi" in Page_Source:
             self.verify_wallet()
+            self.current_page = "verification"
             return "verification"
         if "Available Balance" in Page_Source:
+            self.current_page = "wallet_page"
             return "wallet_page"
-        if "Translation loading ..." in Page_Source:
+        if "Transaction Details" in Page_Source:
+            self.current_page = "transaction"
+            return "transaction"
+        if "Allow Pi Browser to send" in Page_Source:
+            self.click_phone_notif()
+            self.current_page = "phone_notif"
+            return "phone_notif"
+        if "Update your app" in Page_Source or "Translation loading ..." in Page_Source:
             self.click_update()
+            self.current_page = "update"
             return "update"
-        if "Pay or Request" in Page_Source:
-            return "transfer"
-        if "Manually Add Wallet Address" in Page_Source:
-            return "transfer"
-        if "You are about to send" in Page_Source:
-            return "transfer"
-        if "Error!" in Page_Source:
-            return "transfer"
-        if "Start Mining Pi Effortlessly" in Page_Source:
-            return "remind"
-        if "Wallet Address" in Page_Source and "Memo (optional)" in Page_Source:
-            return "transfer"
+        if "blockexplorer" in Page_Source:
+            self.current_page = "blockexplorer"
+            return "blockexplorer"
+        if "You are about to send" in Page_Source or "Memo (optional)" in Page_Source or "Manually Add Wallet Address" in Page_Source:
+            self.current_page = "transfer_page"
+            return "transfer_page"
+        if "Start Mining Pi Effort" in Page_Source or "try mining now" in self.driver.page_source.lower():
+            self.current_page = "try_mining"
+            return "try_mining"
+        if "System UI isn't" in Page_Source:
+            self.current_page = "systemerr"
+            return "systemerr"
+        
         return ""
 
     def check_current_wallet_balance(self):
@@ -120,6 +158,8 @@ class AndroidBot():
                 self.click_update()
             if current_page == "verification":
                 self.verify_wallet()
+            if current_page == "try_mining":
+                self.click_try_mining()
             current_page = self.check_current_page()
         try:
             logger.debug("Trying to get available balance")
@@ -146,19 +186,28 @@ class AndroidBot():
             if self.check_current_page() == "home":
                 break
             pass
-        
+    
+    # From home page open "Wallet" Page
     def open_wallet_sub_page(self):
-        try:
-            logger.debug("Opening wallet sub page")
-            self.driver.tap([(160,330)])
-        except:
-            logger.error("Error going to sub page")
         while self.check_current_page() != "wallet_home":
+            if self.check_current_page() == "home":
+                try:
+                    logger.debug("Opening wallet sub page")
+                    self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value='new UiSelector().text("Wallet logo")').click()
+                except:
+                    logger.error("Error going to sub page")
             self.click_notif()
             pass
-            
+    def reset_system_app(self):
+        try:
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Close app")]').click()
+            sleep(3)
+            self.driver.activate_app('pi.browser/com.pinetwork.MainActivity')
+        except:
+            logger.error("Error resetting system UI after error")
     def navigate_to_wallet_home(self):
         current_page = self.check_current_page()
+        tries = 0
         while current_page != "wallet_home": 
             logger.debug(f"Current page before match: {current_page}")  # Debugging line
             match current_page:
@@ -168,20 +217,28 @@ class AndroidBot():
                     self.reload_wallet_page()
                 case "home":
                     self.open_wallet_sub_page()
+                case "transaction":
+                    self.tap_menu_burger()
                 case "loading":
                     logger.debug("Still loading")
                 case "notification":
                     logger.debug("Notification Found")
                 case "update":
                     logger.debug("Update notification found")
+                    if tries > 50:
+                        self.tap_menu_burger()
                 case "verification":
                     self.verify_wallet()
-                case "remind":
-                    self.click_remind_button()
-                case "transfer":
-                    self.click_back_button()
+                case "blockexplorer":
+                    self.tap_menu_burger()
+                case "transfer_page":
+                    self.tap_menu_burger()
+                case "systemerr":
+                    self.reset_system_app()
                 case _:
                     logger.warning("Got undefined while navigating to wallet home")
+                    sleep(1)
+            tries += 1
             current_page = self.check_current_page()
             logger.debug(f"Current page after match: {current_page}")  # Debugging line
     
@@ -189,7 +246,9 @@ class AndroidBot():
         try:
             logger.debug("Trying to enter wallet phrase")
             login_box = self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.EditText')
+            sleep(0.4)
             login_box.clear()
+            sleep(0.4)
             login_box.send_keys(pwd)
             self.driver.hide_keyboard()
             self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.Button[contains(@text, "Unlock With")]').click()
@@ -198,23 +257,50 @@ class AndroidBot():
             logger.error("Error entering wallet phrase")
             return False
     
+    
     def enter_wallet_phrase(self, pwd:str)-> str:
+        
         logger.debug("Received enter wallet phrase command")
-        page = self.driver.page_source
-        error_check = 0
-        while self.try_enter_wallet(pwd) != True:
+        page = ""
+        tries = 0
+        check_page = 0
+        while tries < 9:
+            while self.check_current_page() != "wallet_home":
+                if check_page == 20:
+                    app = self.driver.current_package
+                    self.driver.terminate_app(app)
+                    sleep(1)
+                    self.driver.activate_app(app)
+                    sleep(1)
+                    self.open_wallet_sub_page()
+                sleep(1)
+                if self.check_current_page() == "wallet_page":
+                    break
+                check_page += 1
             self.try_enter_wallet(pwd)
             page = self.driver.page_source
+            if "Loading" in page:
+                pass
+            if "An error occurred" in page:
+                return "error"
             if "Available Balance" in page:
                 break
-            if error_check == 5:
-                return "error"
-            if "An error" in page:
-                error_check += 1
-            if "Invalid" in page:
-                error_check += 1
             if "This is your identity on the Pi Blockchain" in self.driver.page_source:
-                self.verify_wallet()
+                if self.verify_wallet():
+                    break
+            if "Welcome to the Pi Browser" in self.driver.page_source:
+                self.open_wallet_sub_page()
+            if "Continue with phone number" in self.driver.page_source:
+                break
+            if "Register with phone number" in self.driver.page_source:
+                break
+            if "Enter your password" in self.driver.page_source:
+                break
+            tries +=1
+        
+        # if tries == 6:
+        #     self.capture_screen()
+        page = self.driver.page_source
         if "An error" in page:
             return "error"
         elif "Invalid" in page:
@@ -228,6 +314,15 @@ class AndroidBot():
         logger.debug("Received sign out user command")
         result = False
         while result == False:
+            if "Continue with phone number" in self.driver.page_source:
+                result = True
+                break
+            if "Register with phone number" in self.driver.page_source:
+                result = True
+                break
+            if "Enter your password" in self.driver.page_source:
+                result = True
+                break
             try:
                 self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Sign Out")]').click()
                 sleep(0.4)
@@ -235,22 +330,48 @@ class AndroidBot():
                 result = True
             except:
                 logger.error("Unable to sign out")
+                print(self.driver.current_activity)
+                if "blockchainvault" not in self.driver.current_package:
+                    self.driver.activate_app('com.blockchainvault/com.pinetwork.MainActivity')
+                    sleep(3)
+                result = False
+                break
             sleep(0.3)
-        
-    def open_profile_page(self) -> None:
-        logger.debug("Opening profile page")
-        if "Referral Team" not in self.driver.page_source and "Node" not in self.driver.page_source:
-            sleep(0.3)
-            self.driver.tap([(30,50)])
-        sleep(0.35)
-        self.driver.flick(100,500,100,200)
-        sleep(0.3)
+        return result
+    
+    
+    def tap_menu_burger(self) -> None:
         try:
-            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Profile")]').click()
+            menu_burger = (floor(self.width*0.09), floor(self.height*0.065))
+            sleep(0.3)
+            self.driver.tap([(menu_burger)])
         except:
-            logger.error("Error clicking profile button")
-        self.sign_out_user()
-        
+            logger.error("Error tapping menu burger")
+    
+    def open_profile_page(self) -> None:
+        try:
+            if "Referral Team" not in self.driver.page_source and "Node" not in self.driver.page_source:
+                self.tap_menu_burger()
+                sleep(1)
+            self.driver.flick(100,self.height*0.5,100,self.height*0.2)
+            sleep(1)
+            try:
+                self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Profile")]').click()
+            except:
+                logger.error("Error clicking profile button")
+                self.driver.tap([(self.width*0.23,self.height*0.79)])
+            sleep(1)
+        except:
+            logger.error("Error opening profile page")
+            raise
+    
+    def start_logout_user(self) -> None:
+        logger.debug("Opening profile page")
+        self.open_profile_page()
+        while self.sign_out_user() == False:
+            self.open_profile_page()
+            self.sign_out_user()
+            
     def enter_keyboard_indonesia(self):
         self.driver.press_keycode(37)
         self.driver.press_keycode(42)
@@ -261,17 +382,28 @@ class AndroidBot():
     def insert_phone_number(self, account: PiAccount)-> bool:
         try:
             logger.debug("Inserting phone number")
-            while "Register with phone number" not in self.driver.page_source:
+            if "Continue with phone number" in self.driver.page_source:
                 self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "with phone number")]').click()
-                sleep(0.2)
-            country_box = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "United States")]')
-            country_box.click()
+                sleep(1)
+            # while "Register with phone number" not in self.driver.page_source:
+            #     print("Clicking register with phone number")
+            #     self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "with phone number")]').click()
+            #     sleep(0.2)
+            input_boxes = self.driver.find_elements(by=AppiumBy.CLASS_NAME, value='android.widget.EditText')
+            # country_box = self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "United States")]')
+            country_box = input_boxes[0]
+            # country_box.click()
             sleep(0.2)
-            self.enter_keyboard_indonesia()
-            self.driver.hide_keyboard()
-            self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.TextView[contains(@text, "Phone number")]').click()
-            phone_box = self.driver.find_element(by=AppiumBy.XPATH, value='//android.view.View[@resource-id="root"]/android.view.View/android.view.View/android.view.View/android.view.View[3]/android.widget.EditText')
+            country_box.send_keys("indonesia")
+            sleep(0.2)
+            self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.TextView[@text="Phone number:"]').click()
+            # self.enter_keyboard_indonesia()
+            # self.driver.hide_keyboard()
+            # self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.TextView[contains(@text, "Phone number")]').click()
+            # phone_box = self.driver.find_element(by=AppiumBy.XPATH, value='//android.view.View[@resource-id="root"]/android.view.View/android.view.View/android.view.View/android.view.View[3]/android.widget.EditText')
+            phone_box = input_boxes[1]
             phone_box.send_keys(account.phone)
+            logger.debug("Clicking submit button")
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Submit")]').click()
             sleep(0.5)
             return True
@@ -279,19 +411,21 @@ class AndroidBot():
             logger.error("Error inserting phone number")
             return False
     
-    def enter_phone_number(self, account: PiAccount) -> bool:
+    def enter_phone_password(self, account: PiAccount) -> bool:
         try:
             while "Enter your password" in self.driver.page_source:
                 logger.debug("Trying to insert phone number")
+                sleep(1)
                 password_box = self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.EditText')
                 password_box.send_keys(account.password)
+                sleep(1)
                 self.driver.hide_keyboard()
                 self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Submit")]').click()
                 sleep(0.5)
             return True
         except:
             logger.error("Error inserting phone number")
-          
+        
     def login_with_phone_number(self) -> bool:
         try:
             logger.debug("Getting new wallet account")
@@ -301,58 +435,103 @@ class AndroidBot():
             return False
         try:
             logger.debug("Logging in with new phone number")
-            self.insert_phone_number(account)
-            self.enter_phone_number(account)
+            while "Register with phone number" not in self.driver.page_source:
+                self.insert_phone_number(account)
+                if "Enter your password" in self.driver.page_source:
+                    break
+            sleep(1)
+            self.enter_phone_password(account)
             while "Enter your password" in self.driver.page_source:
                 logger.warning("Still in password form")
-                self.driver.hide_keyboard()
-                if "Invalid phone number" in self.driver.page_source:
-                    self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Return to login")]').click()
-                    delete_wallet_account(account)
-                    return False
+                self.enter_phone_password(account)
+                # self.driver.hide_keyboard()
+                try:
+                    if "Invalid phone number" in self.driver.page_source:
+                        self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Return to login")]').click()
+                        delete_wallet_account(account)
+                        return False
+                except:
+                    pass
             return True
         except Exception as e:
             logger.error(f"Error occured while logging in with phone number, {e}")
     
+    def dismiss_contributor(self):
+        try:
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Dismiss")]').click()
+        except:
+            logger.error("Error clicking dismiss contributor")
+    
     def navigate_to_pi_network(self) -> None:
         try:
             logger.debug("Navigation to pi network, clicking keep on mining")
+            width = floor(self.width * 0.97)
+            min_height = floor(self.height * 0.35)
+            max_height = floor(self.height * 0.76)
             while "Keep on mining" not in self.driver.page_source:
-                self.driver.tap([(260,300)])
-                self.driver.tap([(260,310)])
-                self.driver.tap([(260,340)])
-                self.driver.tap([(260,360)])
-                if "Mine by confirming" in self.driver.page_source:
-                    self.driver.tap([(150,570)])
-                    sleep(0.3)
-                    self.driver.tap([12,74])
-                    break
                 if "Mining Session Ends" in self.driver.page_source:
-                    self.driver.tap([(40,50)])
+                    self.click_back_button_login()
                     break
-                sleep(0.2)
+                if "Continue with phone number" in self.driver.page_source:
+                    break
+                if "Register with phone number" in self.driver.page_source:
+                    break
+                if "Enter your password" in self.driver.page_source:
+                    break
+                if "You just unlocked" in self.driver.page_source:
+                    self.dismiss_contributor()
+                if "Referral" in self.driver.page_source or "Sharing text" in self.driver.page_source:
+                    self.tap_menu_burger()
+                    break
+                if "Mine by confirming" in self.driver.page_source:
+                    try:
+                        sleep(1)
+                        self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.Button[@text="Mine"]').click()
+                        self.driver.tap([(self.width*0.46,self.height*0.89)])
+                        sleep(0.3)
+                        self.tap_menu_burger()
+                        break
+                    except:
+                        logger.error("Error clicking mine by confirming")
+                for i in range(min_height,max_height,60):
+                    if "Mine by confirming" in self.driver.page_source:
+                        break
+                    if "Referral" in self.driver.page_source:
+                        break
+                    if "Mining Session Ends" in self.driver.page_source:
+                        break
+                    if "Sharing" in self.driver.page_source:
+                        break
+                    sleep(0.1)
+                    self.driver.tap([(width, i)])
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Not Now")]').click()
             self.driver.tap([(50,350)])
         except:
-            logger.error("Error navigating to pi network")
+            logger.error(f"Error navigating to pi network")
     
     def login_to_browser(self) -> bool:
         try:
             logger.debug("Logging in to pi browser after signing in")
             if "Referral Team" not in self.driver.page_source and "Node" not in self.driver.page_source:
                 sleep(0.3)
-                self.driver.tap([(30,50)])
+                self.tap_menu_burger()
             sleep(0.35)
-            self.driver.flick(100,200,100,300)
-            sleep(0.3)
-            self.driver.tap([(110,200)])
-            sleep(0.3)
-            self.driver.flick(100,300,100,200)
+            self.driver.flick(100,self.height*0.2,100,self.height*0.5)
+            sleep(0.5)
+            self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.Button[@text="Pi Browser"]').click()
+            # sleep(0.5)
+            # self.driver.flick(100,400,100,100)
             sleep(1)
-            self.driver.tap([(150,620)])
+            try:
+                self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Alternative Sign In")]').click()
+            except:
+                pass
             current_tries = 0
             result = False
             while current_tries < 5:
+                if "pi.browser" in self.driver.current_package:
+                    result = True
+                    break
                 if "Welcome to the Pi Browser" in self.driver.page_source:
                     logger.debug("Successfully logged into browser")
                     result = True
@@ -362,7 +541,10 @@ class AndroidBot():
                     result = True
                     break
                 if "If above button doesn't" in self.driver.page_source:
-                    self.driver.tap([(150,620)])
+                    try:
+                        self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text,"Alternative Sign")]').click()
+                    except:
+                        pass
                 else:
                     sleep(1)
                     current_tries += 1
@@ -370,7 +552,7 @@ class AndroidBot():
         except:
             logger.error("Error logging in to pi browser")
             return False
-            
+         
     def start_login_user(self) -> None:
         try:
             logger.debug("Start logging in new user")
@@ -389,14 +571,17 @@ class AndroidBot():
     def check_if_user_verif_needed(self) -> bool:
         try:
             logger.debug("Handling user verification")
-            if "Sign out" in self.driver.page_source:
+            if "Sign out" in self.driver.page_source or  "Sign Out" in self.driver.page_source:
                 return True
-            self.driver.tap([(20,50)])
-            sleep(1)
+            if "Total mining" in self.driver.page_source:
+                self.tap_menu_burger()
+                return True
+            elif "Continue with phone" in self.driver.page_source or "Please verify your identity" in self.driver.page_source:
+                return True
+            self.tap_menu_burger()
             if "Chat" in self.driver.page_source and "Roles" in self.driver.page_source and "Referral" in self.driver.page_source:
                 return True
-            self.driver.tap([(20,50)])
-            sleep(1)
+            self.tap_menu_burger()
             if "Chat" in self.driver.page_source and "Roles" in self.driver.page_source and "Referral" in self.driver.page_source:
                 return True
             elif "Continue with phone" in self.driver.page_source or "Please verify your identity" in self.driver.page_source:
@@ -422,24 +607,18 @@ class AndroidBot():
             self.start_login_user()
         else:
             logger.debug("Not in profile page")
-            self.open_profile_page()
+            self.start_logout_user()
             self.start_login_user()
     
     def start_send_coin(self):
         res = False
         try:
-            self.driver.tap([(180,420)])
+            self.driver.tap([(800,1650)])
             sleep(0.06)
-            self.driver.tap([(180,500)])
+            self.driver.tap([(800,1800)])
             sleep(0.06)
-            self.driver.tap([(180,420)])
+            self.driver.tap([(800,1650)])
             sleep(0.06)
-            # if "Memo (optional)" in self.driver.page_source:
-            #     self.driver.find_element(by=AppiumBy.XPATH, value='//*[@text="Send"]').click()
-            # if "Do you recognize" in self.driver.page_source:
-            #     self.driver.find_element(by=AppiumBy.XPATH, value='//*[@text="Confirm"]').click()
-            # if "Error!" in self.driver.page_source:
-            #     self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Close")]').click()
             return res
         except:
             return res
@@ -447,13 +626,15 @@ class AndroidBot():
     
     def scroll_to_bottom(self):
         sleep(0.5)
-        self.driver.flick(100,500,100,200)
+        self.driver.flick(100,1900,100,200)
+        sleep(0.5)
     
     def enter_wallet_address(self):
         try:
             logger.debug("Entering wallet address")
-            element = self.driver.find_element(by=AppiumBy.XPATH, value='//android.widget.EditText[contains(@resource-id, "mui")]')
-            element.send_keys(WALLET_DEST)
+            element = self.driver.find_elements(by=AppiumBy.CLASS_NAME, value='android.widget.EditText')
+            sleep(1)
+            element[2].send_keys(WALLET_DEST)
             self.driver.hide_keyboard()
         except:
             logger.error("Unable to enter receiver wallet address")
@@ -463,6 +644,7 @@ class AndroidBot():
             logger.debug("Entering send amount")
             amount_box = self.driver.find_element(by=AppiumBy.ANDROID_UIAUTOMATOR, value='new UiSelector().className("android.widget.EditText").instance(0)')
             amount_box.send_keys(amount)
+            sleep(1)
             self.driver.hide_keyboard()
         except:
             logger.error("Error entering send amount")
@@ -478,27 +660,25 @@ class AndroidBot():
         except:
             logger.error("Error opening pay/request page!")
     
-    
+        
     def open_wallet_from_passphrase(self, pwd: str):
         self.driver.activate_app('pi.browser/com.pinetwork.MainActivity')
         logger.info(f"Received new request for phrase: {pwd}")
-        if self.check_current_page() == "wallet_home":
+        current_page = self.check_current_page()
+        if current_page == "wallet_home":
             self.click_back_button()
-        if self.check_current_page() != "wallet_home":
+        elif current_page == "transaction":
+            self.click_back_button()
+        else:
             self.navigate_to_wallet_home()
+        
         result = self.enter_wallet_phrase(pwd)
         if result == "exception":
-            while result == "exception":
-                result = self.enter_wallet_phrase(pwd)
-                if result == "error":
-                    break
+            result = self.enter_wallet_phrase(pwd)
         if result == "error":
             return "Error butuh ganti ke user lain"
         if result == "invalid":
-            i = 0
-            while i < 3:
-                result = self.enter_wallet_phrase(pwd)
-                i += 1
+            result = self.enter_wallet_phrase(pwd)
             if result == "ok":
                 self.check_current_page()
             elif result == "error":
@@ -508,8 +688,12 @@ class AndroidBot():
         else:
             self.check_current_page()
         logger.debug(f"Current value = {result}")
+        if result == "exception":
+            return "Error butuh ganti ke user lain"
         value = self.check_current_wallet_balance()
         store_phrase(pwd, value)
+        
+        # Get data of held coins
         return value
     
     def open_wallet_after_error(self, pwd: str):
@@ -526,8 +710,11 @@ class AndroidBot():
         if "error" in open_phrase.lower():
             self.open_wallet_after_error(pwd)
         self.open_pay_page()
+        sleep(2)
         self.enter_send_amount(amount)
+        sleep(2)
         self.enter_wallet_address()
+        sleep(2)
         self.scroll_to_bottom()
         current_time = time()
         logger.debug("Start sending coin")
@@ -550,17 +737,17 @@ class AndroidBot():
         self.driver.quit()
 
 def get_running_bot():
-    if len(running_bot) != 0:
-        logger.debug("Found running bot")
-        bot: AndroidBot = running_bot[0]
-        if time() - bot.age > 4800:
-            logger.debug("Bot exceeds maximum time, creating a new one")
-            del bot
-        else:
-            return bot
+    # if len(running_bot) != 0:
+    #     logger.debug("Found running bot")
+    #     bot: AndroidBot = running_bot[0]
+    #     if time() - bot.age > 4800:
+    #         logger.debug("Bot exceeds maximum time, creating a new one")
+    #         del bot
+    #     else:
+    #         return bot
     logger.debug("Creating a new bot.")
     bot = AndroidBot()
-    running_bot.append(bot)
+    # running_bot.append(bot)
     logger.info(f"Running bot count : {len(running_bot)}")
     return bot
 

@@ -128,7 +128,8 @@ async def schedule_get_time(update:Update, context: CallbackContext) -> int:
         if check_schedule(time_data) == False:
             await update.message.reply_text("Sudah ada schedule yang berjalan pada jam yang diberikan. Jika ingin cancel, /cancel")
             return TIME
-    context.user_data['time'] = time_data - timedelta(minutes=TRANSACTION_PREP_DURATION)
+    # context.user_data['time'] = time_data - timedelta(minutes=TRANSACTION_PREP_DURATION)
+    context.user_data['time'] = datetime.now() + timedelta(seconds=10)
     await update.message.reply_text("Berapa nominal yang ingin dikirim")
     return AMOUNT
 
