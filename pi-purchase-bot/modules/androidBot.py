@@ -656,9 +656,10 @@ class AndroidBot():
             while "Manually Add Wallet Address" not in self.driver.page_source:
                 if "Fee" in self.driver.page_source or "Memo" in self.driver.page_source or "Dismiss" in self.driver.page_source:
                     logger.debug("Opened transaction details ")
+                    sleep(1)
                     self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Dismiss")]').click()
                     sleep(1)
-                    self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Pay / Request")]').click()
+                    self.driver.tap([(250,800)])
                     sleep(1)
                 logger.debug("Waiting for entering wallet address manually")
                 sleep(0.2)
