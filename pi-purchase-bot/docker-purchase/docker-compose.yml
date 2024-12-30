@@ -1,6 +1,6 @@
 services:
-  pi-purchase-bot:
-    image: pi-purchase-bot:1.3.0
+  bot:
+    image: pi-purchase-bot:2.0.0
     restart: always
     network_mode: host
     container_name: pi-purchase-bot
@@ -8,7 +8,7 @@ services:
       - .env
     volumes:
       - ./data:/bot/data
-  appium-server-purchase:
+  server-purchase:
     image: appium/appium
     container_name: appium-server-purchase
     ports:
