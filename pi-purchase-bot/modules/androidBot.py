@@ -654,7 +654,8 @@ class AndroidBot():
             logger.debug("Opening Pay/Request Page")
             self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Pay / Request")]').click()
             while "Manually Add Wallet Address" not in self.driver.page_source:
-                if "Transaction Details" in self.driver.page_source:
+                if "Fee" in self.driver.page_source or "Memo" in self.driver.page_source or "Dismiss" in self.driver.page_source:
+                    logger.debug("Opened transaction details ")
                     self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Dismiss")]').click()
                     sleep(1)
                     self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Pay / Request")]').click()
