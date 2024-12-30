@@ -12,6 +12,7 @@ WALLET_DEST= os.getenv("WALLET_DEST")
 DEV_MODE = bool(os.getenv("DEV_MODE")) if os.getenv("DEV_MODE") else False
 TIMEOUT_LIMIT = int(os.getenv("TIMEOUT_LIMIT"))
 TRY_SEND_DURATION = int(os.getenv("TRY_SEND_DURATION"))
+TRANSACTION_PREP_DURATION= int(os.getenv("TRANSACTION_PREP_DURATION")) if os.getenv("TRANSACTION_PREP_DURATION") else 3
 
 def get_all_env():
     data = [f"{i}: {j}" for i,j in os.environ.items()]

@@ -1,7 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler, CallbackContext, ConversationHandler, Defaults
-from modules.environment import BOT_USERNAME,TOKEN, DEV_MODE
+from modules.environment import BOT_USERNAME,TOKEN, DEV_MODE, TRANSACTION_PREP_DURATION
 from modules.androidBot import start_transaction_process
 from typing import List
 from datetime import datetime, timedelta
@@ -128,7 +128,7 @@ async def schedule_get_time(update:Update, context: CallbackContext) -> int:
         if check_schedule(time_data) == False:
             await update.message.reply_text("Sudah ada schedule yang berjalan pada jam yang diberikan. Jika ingin cancel, /cancel")
             return TIME
-    context.user_data['time'] = time_data - timedelta(minutes=3)
+    context.user_data['time'] = time_data - timedelta(minutes=TRANSACTION_PREP_DURATION)
     await update.message.reply_text("Berapa nominal yang ingin dikirim")
     return AMOUNT
 
@@ -150,7 +150,7 @@ Terima kasih. Berikut info yang diterima
 
 Phrase : {user_data['phrase']}
 
-Waktu : {user_data['time'] + timedelta(minutes=3)}
+Waktu : {user_data['time'] + timedelta(minutes=TRANSACTION_PREP_DURATION)}
 
 Jumlah coin : {user_data['amount']}
 
@@ -218,7 +218,7 @@ async def list_all_jobs_command(update: Update, context: ContextTypes.DEFAULT_TY
             message += f'''
 {index+1}. Job_Name : {i.name}
 
-Jadwal : {i.schedule + timedelta(minutes=3)}
+Jadwal : {i.schedule + timedelta(minutes=TRANSACTION_PREP_DURATION)}
 
 Phrase : {i.pass_phrase}
 

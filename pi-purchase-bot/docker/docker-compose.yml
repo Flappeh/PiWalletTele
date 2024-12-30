@@ -1,18 +1,11 @@
 services:
   pi-purchase-bot:
-    image: pi-purchase-bot:1.1.1
+    image: pi-purchase-bot:1.3.0
     restart: always
     network_mode: host
     container_name: pi-purchase-bot
     env_file:
       - .env
-    # environment:
-    #   - TOKEN=7217378842:AAGipq5KCagsO6G-fhhiiVrhfWgxgmB9JDk
-    #   - BOT_USERNAME=@pi_wallet_monitor_bot
-    #   - BLOCKCHAIN_URI=https://api.mainnet.minepi.com
-    #   - PYPPETEER_CHROMIUM_REVISION=1263111
-    #   - ANDROID_SERVER_URL=http://localhost:4723
-    #   - TIMEOUT_LIMIT=600
     volumes:
       - ./data:/bot/data
   appium-server-purchase:
