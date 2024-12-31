@@ -617,8 +617,6 @@ class AndroidBot():
             sleep(0.06)
             self.driver.tap([(800,1800)])
             sleep(0.06)
-            self.driver.tap([(800,1650)])
-            sleep(0.06)
             return res
         except:
             return res
