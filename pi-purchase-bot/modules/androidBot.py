@@ -136,7 +136,7 @@ class AndroidBot():
         if "blockexplorer" in Page_Source:
             self.current_page = "blockexplorer"
             return "blockexplorer"
-        if "You are about to send" in Page_Source or "Memo (optional)" in Page_Source or "Manually Add Wallet Address" in Page_Source:
+        if "You are about to send" in Page_Source or "Memo (optional)" in Page_Source or "Manually Add Wallet Address" in Page_Source or "sum of amount and transaction" in Page_Source:
             self.current_page = "transfer_page"
             return "transfer_page"
         if "Start Mining Pi Effort" in Page_Source or "try mining now" in self.driver.page_source.lower():
@@ -611,15 +611,21 @@ class AndroidBot():
             self.start_login_user()
     
     def start_send_coin(self):
-        res = False
         try:
-            self.driver.tap([(800,1650)])
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Send")]').click()
             sleep(0.06)
-            self.driver.tap([(800,1800)])
-            sleep(0.06)
-            return res
         except:
-            return res
+            pass
+        try:
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Confirm")]').click()
+            sleep(0.06)
+        except:
+            pass
+        try:
+            self.driver.find_element(by=AppiumBy.XPATH, value='//*[contains(@text, "Close")]').click()
+            sleep(0.06)
+        except:
+            pass
             
     
     def scroll_to_bottom(self):
