@@ -46,7 +46,7 @@ async def run_transaction_job(context: ContextTypes.DEFAULT_TYPE):
     finish_schedule(job.name)
     
 async def schedule_job_run(update: Update, context: CallbackContext, user_data):
-    job_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
+    job_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
     store_schedule(job_name=job_name, user_data=user_data,chat_id=update.effective_chat.id)
     context.job_queue.run_once(
         callback=run_transaction_job, 
